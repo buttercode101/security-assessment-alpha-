@@ -36,7 +36,7 @@ jobs:
             ok: true,
             service: "security-assessment-alpha",
             mode: "passive-only",
-            scanner_state: "paused",
+            scanner_state: "ready",
             egress: "gateway-vpc"
           });
 
