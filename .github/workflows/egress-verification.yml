@@ -1,0 +1,17 @@
+name: Temporary scanner egress verification
+on:
+  push:
+    paths:
+      - "docs/SECURITY_MODEL.md"
+permissions:
+  contents: read
+jobs:
+  invoke-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Run fixed destination checks through the VPC Worker
+        run: |
+          set -eu
+          curl --fail-with-body --silent --show-error --max-time 90 \
+            "https://secops-egress-check.buttercoder-dev.workers.dev/run-6f9e4cb1-9d0e-4c90-b31f-6ad08b7c"
