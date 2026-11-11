@@ -22,7 +22,7 @@
 - The IPv4 link-local probe timed out; its result is inconclusive.
 - A temporary test policy targeting a known public IP and temporary HTTP policies targeting a public host did not block the corresponding Worker requests. This means Gateway policy matching/attribution is **not proven**, and the private-address rejections cannot yet be attributed to the configured Gateway L4 rule. Do not treat these results as proof that Gateway is enforcing the configured CIDR policy.
 - Gateway activity logging is enabled with DNS, HTTP, and L4 events and PII redaction. The relevant Gateway activity records still need to be inspected in Zero Trust > Insights > Logs, including Traffic Source, Traffic Destination, policy action, and rule name. Workers Observability logs alone do not prove Gateway enforcement.
-- The temporary diagnostic Worker, test policies, GitHub Actions workflow, and D1 probe table are disposable test resources and must be removed after verification.
+- The temporary diagnostic Worker, temporary Gateway test rules, GitHub Actions workflow, and D1 probe table were removed after testing. The persistent scanner VNet and intended non-public-destination L4 policy were left intact.
 
 ## Critical limitations (not production-safe)
 1. The production Worker has an EGRESS binding, but scanner readiness remains disabled.
