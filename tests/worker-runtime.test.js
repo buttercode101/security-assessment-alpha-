@@ -42,7 +42,9 @@ test("health endpoint is available without creating a workspace", async () => {
   assert.deepEqual(await response.json(), {
     ok: true,
     service: "security-assessment-alpha",
-    mode: "passive-only"
+    mode: "passive-only",
+    scanner_state: "paused",
+    egress: "gateway-vpc"
   });
 });
 
