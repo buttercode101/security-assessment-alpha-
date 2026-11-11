@@ -27,8 +27,9 @@ test("cookie has secure browser protections", () => {
   assert.match(source, /; Secure; HttpOnly; SameSite=Strict/);
 });
 
-test("UI tells the truth that scanning is paused", () => {
-  assert.match(source, /Assessments are temporarily paused/);
+test("UI hides the paused notice when the health endpoint reports scanner readiness", () => {
+  assert.match(source, /id="scan-notice"/);
+  assert.match(source, /\$\("#scan-notice"\)\.hidden=scannerReady/);
 });
 
 test("inline UI assets use per-response CSP nonces", () => {
