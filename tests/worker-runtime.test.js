@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import worker, { public4, public6 } from "../worker.js";
+import worker, { public4, public6, extractCtAssets } from "../worker.js";
 
 function makeEnv() {
   const writes = [];
@@ -221,5 +221,47 @@ test("dashboard client JavaScript parses and all referenced primary controls exi
   assert.doesNotThrow(() => new vm.Script(script[1]), "dashboard JavaScript should parse");
   for (const id of ["form", "url", "add", "targets", "scans", "findings", "refresh", "tc", "sc", "fc"]) {
     assert.ok(html.includes('id="' + id + '"'), "dashboard is missing #" + id);
+  }
+});
+
+
+test("certificate transparency parser keeps only names inside the verified domain and deduplicates", () => {
+  const assets = extractCtAssets([
+    { name_value: "api.example.org\\n*.staging.example.org\\nexample.org\\nnotexample.org\\nmail.other.net", not_before: "2025-01-01", not_after: "2025-04-01", issuer_name: "Issuer A" },
+    { name_value: "api.example.org\\nshop.example.org", not_before: "2026-01-01", not_after: "2026-04-01", issuer_name: "Issuer B" },
+    { name_value: "*.bad..example.org\\n-evil.example.org\\nfoo_example.org" }
+  ], "example.org");
+  assert.deepEqual(assets.map(x => x.hostname), ["api.example.org", "shop.example.org", "staging.example.org"]);
+  assert.equal(assets[0].certificate_not_before, "2026-01-01");
+  assert.equal(assets[0].issuer_name, "Issuer B");
+});
+
+test("certificate transparency parser enforces hostname boundaries", () => {
+  assert.deepEqual(extractCtAssets([{ name_value: "example.org\\nnotexample.org\\nsub.example.org.attacker.net" }], "example.org"), []);
+});
+
+test("asset discovery is available only after ownership verification and stores passive CT evidence", async () => {
+  const { env, writes } = makeEnv();
+  const cookie = await createSession(env);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    assert.match(String(url), /^https:\\/\\/crt\\.sh\\//);
+    return new Response(JSON.stringify([{ name_value: "api.example.org\\nshop.example.org", not_before: "2026-01-01", not_after: "2026-04-01", issuer_name: "Test CA" }]), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/discover", {
+      method: "POST",
+      headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+      body: "{}"
+    }), env);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.assets_discovered, 2);
+    assert.equal(body.source, "certificate-transparency");
+    assert.match(body.note, /do not confirm that a host is currently live/);
+    assert.equal(writes.filter(x => x.sql.includes("INSERT INTO discovered_assets")).length, 2);
+    assert.ok(writes.some(x => x.sql.includes("UPDATE targets SET last_discovery_at")));
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
