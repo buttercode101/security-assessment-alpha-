@@ -8,6 +8,7 @@ Private-alpha security configuration assessment platform. Cloudflare Workers + D
 - Scanning: intentionally paused behind the `SCAN_EGRESS_READY` feature gate until isolated outbound networking and DNS-rebinding protections are proven.
 - Authentication: browser-bound anonymous workspace only; not suitable for public multi-tenant launch.
 - Scope: no exploit testing, crawling, authenticated scanning, load testing, or DDoS functionality.
+- Network preflight rejects malformed IP literals and common non-public IPv4/IPv6 ranges, but this is not a complete address registry or connect-time egress control.
 
 ## Development
 
