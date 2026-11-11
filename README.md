@@ -9,6 +9,7 @@ Private-alpha security configuration assessment platform. Cloudflare Workers + D
 - Authentication: browser-bound anonymous workspace only; not suitable as a public multi-tenant identity system.
 - Scope: no exploit testing, crawling, authenticated scanning, load testing, or DDoS functionality.
 - Public-IP preflight checks are conservative but incomplete and are not connect-time egress enforcement.
+- Cloudflare Access/Zero Trust is not enabled on the account yet; the dedicated Gateway egress policy cannot be created until an administrator enables it in the dashboard.
 
 ## Available workspace capabilities
 
