@@ -216,9 +216,11 @@ test("dashboard client JavaScript parses and all referenced primary controls exi
   const { env } = makeEnv();
   const response = await worker.fetch(new Request("https://alpha.test/"), env);
   const html = await response.text();
-  const script = html.match(/<script nonce="[^"]+">([\\s\\S]*?)<\\/script>/);
-  assert.ok(script, "nonce-protected client script should exist");
-  assert.doesNotThrow(() => new vm.Script(script[1]), "dashboard JavaScript should parse");
+  const scriptStart = html.indexOf('<script nonce="');
+  const scriptBodyStart = html.indexOf(">", scriptStart) + 1;
+  const scriptEnd = html.indexOf("</script>", scriptBodyStart);
+  assert.ok(scriptStart >= 0 && scriptEnd > scriptBodyStart, "nonce-protected client script should exist");
+  assert.doesNotThrow(() => new vm.Script(html.slice(scriptBodyStart, scriptEnd)), "dashboard JavaScript should parse");
   for (const id of ["form", "url", "add", "targets", "scans", "findings", "refresh", "tc", "sc", "fc"]) {
     assert.ok(html.includes('id="' + id + '"'), "dashboard is missing #" + id);
   }
