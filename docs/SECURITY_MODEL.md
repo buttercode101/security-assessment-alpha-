@@ -1,6 +1,6 @@
 # Security model and release gates
 
-<!-- Temporary verification trigger; removed after test. -->
+<!-- Temporary verification trigger; rerun after selector adjustment. -->
 
 ## Current alpha boundaries
 - Browser-bound anonymous workspace cookie; no account identity, MFA, RBAC, or team membership.
