@@ -1,54 +1,69 @@
 # Security model and release gates
 
 ## Current alpha boundaries
+
 - Browser-bound anonymous workspace cookie; no account identity, MFA, RBAC, or team membership.
 - Workspace token is high entropy and only its SHA-256 hash is stored.
 - HTTPS origins only; userinfo, non-standard ports, IP literals, localhost and selected special-use suffixes rejected.
 - Ownership proof is DNS TXT only: `_secops-verification.<hostname>`.
-- DNS A/AAAA preflight rejects malformed literals and common special-purpose ranges. This is conservative but not a complete IANA registry and is not, by itself, an SSRF control.
+- DNS A/AAAA preflight rejects malformed literals and common special-purpose ranges. It is conservative and is not, by itself, an SSRF control.
 - Redirects are not followed.
 - Non-GET API calls require an exact Origin match.
-- The scan route requires both an `EGRESS` VPC binding and `SCAN_EGRESS_READY=enabled`. The binding is configured, but the readiness flag remains absent, so scans remain paused.
-- No crawling, exploit payloads, authentication bypass, load generation, stress tests, or DDoS.
+- The scan route requires both an `EGRESS` VPC binding and `SCAN_EGRESS_READY=enabled`. Both are now deployed.
+- The scan route performs one HTTPS GET to the verified origin, reads response status and selected headers, does not follow redirects and does not crawl or parse the response body.
+- No crawling, exploit payloads, authentication bypass, port scanning, load generation, stress tests, or DDoS.
 
-## Current scanner infrastructure
+## Scanner egress infrastructure
+
 - Cloudflare Access/Zero Trust is enabled.
 - Dedicated virtual network: `secops-scanner-egress`, ID `9c798b90-809b-4f60-b7a1-b11105f71c4e`.
 - That network is configured as the account default network. The production Worker binding is `EGRESS` with `network_id = "cf1:network"`, the documented Workers VPC path for public Internet egress through Cloudflare Gateway.
-- An enabled Gateway L4 block policy is configured to block loopback, private, link-local, shared, documentation, benchmark, multicast, reserved, transition, and non-global IPv4/IPv6 destination ranges. Gateway analytics showed the Worker on-ramp but did not provide a populated virtual network ID. Cloudflare's published Traffic Source selector values do not list Workers VPC, so the unverified `net.onramp.type == "workers_vpc"` condition was removed. The rule now uses the documented `net.offramp.type == "internet"` selector and the destination CIDR list.
-- The production Worker has the D1 binding and VPC binding attached. This configuration has been verified through the Cloudflare API.
-- The account currently has no Cloudflare Tunnels or Mesh nodes listed. The account's VPC binding does not establish private-network reachability.
-- Live runtime probes executed from a temporary Worker through the production-style `EGRESS` VPC binding and wrote results to the existing D1 database. Public HTTPS to `example.com` returned HTTP 200 in repeated runs. Direct loopback/private IPv4, IPv6 loopback/ULA/link-local, and hostnames resolving to private IPv4 were rejected with `ProxyError: destination_ip_prohibited`.
-- The IPv4 link-local probe timed out; its result is inconclusive.
-- Gateway analytics confirmed Worker traffic exits through the Internet off-ramp, but the original rule's VNet selector could not match because `virtualNetworkId` was empty. An attempted Workers VPC Traffic Source selector was not supported by Cloudflare's published selector value list and has been removed. The persistent policy now relies on the documented Internet off-ramp selector plus destination CIDRs. It still requires a post-change probe showing the configured rule ID and block action. Do not treat runtime `destination_ip_prohibited` errors alone as proof that Gateway enforced the CIDR policy.
-- Gateway activity logging is enabled with DNS, HTTP, and L4 events and PII redaction. The relevant Gateway activity records still need to be inspected in Zero Trust > Insights > Logs, including Traffic Source, Traffic Destination, policy action, and rule name. Workers Observability logs alone do not prove Gateway enforcement.
-- The Zero Trust account currently has no Gateway locations, TLS inspection is disabled, and the Gateway certificate binding reports `pending_deployment`. These are additional configuration facts to account for while verifying policy behavior; no causal conclusion has been established.
-- The temporary diagnostic Worker, its cron trigger and subdomain, temporary Gateway test rules, temporary GitHub Actions workflows, and D1 probe table were removed after testing. The production Worker, scanner VNet, and corrected persistent L4 policy were left intact.
+- Production D1 binding: `DB` → `secops-platform-core`.
+- Production release flag: `SCAN_EGRESS_READY=enabled`.
+- Enabled persistent Gateway L4 rule: `SECOPS scanner egress — block non-public destinations`, ID `d8d3c5b9-ac23-4694-a776-5db5c6a6fbaf`.
+- The persistent rule matches Internet-bound Gateway traffic and blocks loopback, private, link-local, shared, documentation, benchmark, multicast, reserved, transition, and non-global IPv4/IPv6 destination ranges. It uses `net.offramp.type == "internet"` plus destination CIDRs; it does not rely on an unsupported Workers VPC Traffic Source selector.
+- Important scope note: because the supported expression does not include a reliable Workers VPC-only source selector, this persistent rule applies to matching Internet-bound Gateway traffic at the account level, not only this Worker. It does not create private-network reachability.
+- Gateway logging is enabled for DNS, HTTP and L4, with PII redaction.
 
-## Critical limitations (not production-safe)
-1. The production Worker has an EGRESS binding, but scanner readiness remains disabled.
-2. Public HTTPS success and runtime private-address rejection have been demonstrated; Gateway policy attribution and enforcement have not.
-3. IPv4 link-local behavior remains unverified.
-4. DNS preflight is a separate lookup from the eventual connection. Gateway policy enforcement at connection time is required; preflight alone is not sufficient.
+## Observed egress validation
+
+Tests were executed from a temporary Worker using the same `cf1:network` VPC binding. That Worker accepted no user-supplied URLs and was deleted after the test.
+
+- Public HTTPS to `example.com` returned HTTP 200 in repeated runs.
+- Direct private IPv4, loopback, IPv6 loopback, IPv6 ULA, IPv6 link-local and a hostname resolving to private IPv4 returned `ProxyError: destination_ip_prohibited`.
+- The IPv4 link-local metadata probe timed out. That individual result is inconclusive; the range remains covered by the persistent Gateway policy.
+- Gateway analytics showed Worker VPC as the on-ramp and Internet as the off-ramp.
+- A controlled policy A/B test added a temporary L4 block rule for the exact public IPv6 addresses observed for `example.com`. The previously successful request then failed during TLS setup; after deleting the temporary rule, the request returned HTTP 200 again. This demonstrates that Gateway L4 policy enforcement can affect Workers VPC egress.
+- The temporary rule, diagnostic Worker and its workers.dev subdomain were deleted. The persistent non-public-destination rule was left enabled.
+- Sampled analytics did not expose a rule ID for the temporary blocked event. The persistent rule's exact rule-ID attribution should still be confirmed in Zero Trust > Insights > Logs before expanding beyond this narrow passive assessment.
+
+The VPC proxy's `destination_ip_prohibited` responses show that the tested private/special-use destinations did not connect, but those errors alone do not identify which Cloudflare layer rejected each destination. The separate Gateway A/B test demonstrates that Gateway policy enforcement is on the egress path.
+
+## Critical limitations
+
+1. This remains a private alpha, not a full vulnerability scanner or penetration-testing service.
+2. A successful DNS TXT verification on a domain controlled by the project owner has not yet been independently exercised in this environment. The live CI lifecycle test checks anonymous workspace creation, target registration, duplicate rejection, rejection of unverified scans and target deletion.
+3. The IPv4 link-local metadata probe timed out and remains inconclusive.
+4. The persistent Gateway rule is account-scoped for matching Internet-bound traffic because a supported Workers VPC-only Traffic Source selector was not available.
 5. The anonymous browser workspace can be lost when browser data is cleared and is not a multi-user identity system.
-6. No global abuse controls, bot controls, account auth, RBAC, MFA, or abuse response process.
-7. Interactive browser flows and DNS ownership verification have not yet been independently exercised end-to-end. CI verifies the live health endpoint, live dashboard HTML, CSP nonce, required sections, and parses the live client script.
+6. No global abuse controls, account auth, RBAC, MFA, account recovery or abuse response process.
+7. No real owner-controlled target has been run through the complete DNS TXT → assessment → history → deletion journey in this environment.
+8. No broader scan features should be added until policy-log attribution, real owner-domain verification, IPv4 link-local behavior, tenant isolation, quotas and abuse controls are independently validated.
 
-## Required before enabling scans
-- Keep the deployed Worker's `EGRESS.fetch()` public HTTPS path working.
-- Prove Gateway blocks loopback, RFC1918, CGNAT, link-local, documentation, benchmark, multicast, reserved, transition, IPv4-mapped IPv6, and other non-global IPv4/IPv6 destinations.
-- Prove hostnames resolving to private or mixed public/private A/AAAA answers cannot bypass the destination block (DNS rebinding).
-- Verify Gateway Network/HTTP logs attribute requests to Workers VPC and show the expected policy enforcement and rule name.
-- Prove the corrected Internet-off-ramp L4 policy blocks a test destination and the non-public IPv4/IPv6 CIDR list, with matching Gateway logs and the persistent rule ID.
-- Keep redirects disabled; if redirect support is ever added, revalidate every destination.
-- Restrict protocol and port to HTTPS/443.
-- Add global and per-workspace/per-target rate limits, concurrency caps, request timeouts, response byte caps and an emergency stop.
-- Separate control plane from scanner runtime and use a durable queue before adding crawling or broader checks.
-- Authenticate users and implement tenant-scoped authorization on every object access.
+## Required before public release or broader scanning
+
+- Independently complete a real DNS TXT ownership challenge on a domain the project owner controls.
+- Confirm Gateway Network/HTTP logs attribute requests to Workers VPC and show the expected persistent rule name and policy action.
+- Resolve the IPv4 link-local probe ambiguity.
+- Add global and per-workspace/per-target rate limits, concurrency caps, request timeouts, response byte caps and an emergency stop before adding any additional request types.
+- Authenticate users and implement tenant-scoped authorization on every object access before multi-user use.
 - Add audit events, abuse reporting, retention/deletion policy and operational alerting.
 - Independently test SSRF, DNS rebinding, IPv4/IPv6 edge cases (including malformed literals, mapped addresses, transition and documentation ranges), redirects, tenant isolation, CSRF, XSS, quotas and failure recovery.
+- Keep redirects disabled; if redirect support is ever added, revalidate every destination.
+- Keep scanner requests restricted to HTTPS/443 and owner-verified targets.
 
 ## Passive asset discovery
+
 - Only a DNS-TXT-verified target can trigger certificate transparency discovery.
 - The Worker queries the fixed `crt.sh` JSON endpoint; the verified hostname is sent to that public third-party service.
 - Returned SAN names are normalized, deduplicated, checked against an exact hostname suffix boundary, limited to 250 hostnames, and persisted with certificate dates and issuer metadata.
@@ -57,9 +72,11 @@
 - DNS checks are limited to one per asset every five minutes. DNS answers do not prove HTTP availability or security.
 
 ## Workspace lifecycle
+
 - Assessment history is returned through a workspace-scoped query.
 - Finding details include stored evidence and remediation text; the UI renders these values using text nodes.
 - Target deletion verifies workspace ownership, then explicitly removes findings, discovered assets, scan events, scans, and the target in dependency order.
 
 ## AI safety
+
 AI may summarize deterministic evidence and draft remediation. It must not expand scope, execute tests, claim exploitability, or mark a finding verified without deterministic evidence and human approval.
