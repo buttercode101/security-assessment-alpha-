@@ -5,7 +5,7 @@
 - Workspace token is high entropy and only its SHA-256 hash is stored.
 - HTTPS origins only; userinfo, non-standard ports, IP literals, localhost and selected special-use suffixes rejected.
 - Ownership proof is DNS TXT only: `_secops-verification.<hostname>`.
-- DNS A/AAAA answers are checked against a partial public-address filter.
+- DNS A/AAAA answers are checked against conservative IPv4/IPv6 syntax and common special-purpose, documentation and transition-range filters; this is not a complete IANA registry implementation.
 - Redirects are not followed.
 - Non-GET API calls require an exact Origin match.
 - Scan route is closed unless `SCAN_EGRESS_READY === true`; do not set this flag in the current Worker.
@@ -13,7 +13,7 @@
 
 ## Critical limitations (not production-safe)
 1. DNS validation is not bound to the actual connection. A separate DNS lookup followed by Worker fetch can be vulnerable to rebinding/TOCTOU.
-2. Public IP classification is incomplete and must not be treated as a complete special-purpose registry implementation.
+2. Public IP classification is deliberately conservative but incomplete. It is a preflight guard only, not a complete IANA special-purpose registry implementation or a substitute for connect-time egress enforcement.
 3. No network-layer egress isolation, scanner sandbox, global rate limiting, bot controls, account auth, or abuse response process.
 4. Cookie-based anonymous workspaces can be lost when browser data is cleared and are not suitable as a multi-user identity system.
 5. The dashboard uses inline script/style with per-response CSP nonces; browser interaction has not yet been independently exercised end-to-end.
@@ -29,7 +29,7 @@
 - Separate control plane from scanner runtime and use a durable queue.
 - Authenticate users and implement tenant-scoped authorization on every object access.
 - Add audit events, abuse reporting, retention/deletion policy and operational alerting.
-- Independently test SSRF, DNS rebinding, IPv4/IPv6 edge cases, redirects, tenant isolation, CSRF, XSS, quotas and failure recovery.
+- Independently test SSRF, DNS rebinding, IPv4/IPv6 edge cases (including malformed literals, mapped addresses, transition and documentation ranges), redirects, tenant isolation, CSRF, XSS, quotas and failure recovery.
 - Keep runtime request tests in CI for origin enforcement, cookie attributes, target URL validation and the scan feature gate.
 
 ## AI safety
