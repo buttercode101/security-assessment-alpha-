@@ -1,4 +1,4 @@
-name: Temporary egress diagnostic
+name: Temporary egress diagnostic (one-shot verification)
 on:
   push:
     paths:
