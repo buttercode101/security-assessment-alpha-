@@ -144,7 +144,7 @@ test("IPv4 public-address filter rejects special-purpose and documentation range
   for (const ip of ["1.1.1.1", "8.8.8.8", "100.63.255.255", "100.128.0.1", "198.51.99.1", "198.52.0.1", "203.0.112.1"]) {
     assert.equal(public4(ip), true, ip);
   }
-  for (const ip of ["999.1.1.1", "1.2.3", "1.2.3.4.5", "1.a.3.4"]) assert.equal(public4(ip), false, ip);
+  for (const ip of ["999.1.1.1", "1.2.3", "1.2.3.4.5", "1.a.3.4", "1..2.3", "01.2.3.4"]) assert.equal(public4(ip), false, ip);
 });
 
 test("IPv6 public-address filter rejects non-global, transition and documentation ranges", () => {
@@ -156,5 +156,5 @@ test("IPv6 public-address filter rejects non-global, transition and documentatio
   for (const ip of ["2606:4700:4700::1111", "2001:4860:4860::8888", "2a00:1450::1", "3fff:1000::1"]) {
     assert.equal(public6(ip), true, ip);
   }
-  for (const ip of ["not-an-ip", "2001:::1", "2001:db8::1%eth0", "2001:4860::1.2.3.4"]) assert.equal(public6(ip), false, ip);
+  for (const ip of ["not-an-ip", "2001:::1", "2001:db8::1%eth0", "2001:4860::1.2.3.4", "2001:4860:::1", "2001:4860:1:2:3:4:5:6:7"]) assert.equal(public6(ip), false, ip);
 });
