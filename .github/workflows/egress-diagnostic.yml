@@ -1,0 +1,13 @@
+name: Temporary egress check
+on:
+  push:
+    paths:
+      - ".github/workflows/egress-diagnostic.yml"
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger fixed diagnostic
+        run: node -e "fetch('https://secops-egress-check.buttercoder-dev.workers.dev/verify-65a6b9c1-d330-45a7-b13d-e7200b171057').then(async r => { console.log(r.status, await r.text()); if (!r.ok) process.exit(1); })"
