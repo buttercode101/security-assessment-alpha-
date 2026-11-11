@@ -1,7 +1,5 @@
 # Security model and release gates
 
-<!-- Temporary verification trigger; rerun after after Gateway propagation wait. -->
-
 ## Current alpha boundaries
 - Browser-bound anonymous workspace cookie; no account identity, MFA, RBAC, or team membership.
 - Workspace token is high entropy and only its SHA-256 hash is stored.
@@ -17,15 +15,15 @@
 - Cloudflare Access/Zero Trust is enabled.
 - Dedicated virtual network: `secops-scanner-egress`, ID `9c798b90-809b-4f60-b7a1-b11105f71c4e`.
 - That network is configured as the account default network. The production Worker binding is `EGRESS` with `network_id = "cf1:network"`, the documented Workers VPC path for public Internet egress through Cloudflare Gateway.
-- An enabled Gateway L4 block policy is scoped to that VNet and the Internet off-ramp. It is configured to block loopback, private, link-local, shared, documentation, benchmark, multicast, reserved, transition, and non-global IPv4/IPv6 destination ranges.
+- An enabled Gateway L4 block policy is configured to block loopback, private, link-local, shared, documentation, benchmark, multicast, reserved, transition, and non-global IPv4/IPv6 destination ranges. Its selector was corrected from the VNet ID (which Gateway analytics showed as empty on Worker sessions) to `net.onramp.type == "workers_vpc"` plus `net.offramp.type == "internet"`.
 - The production Worker has the D1 binding and VPC binding attached. This configuration has been verified through the Cloudflare API.
 - The account currently has no Cloudflare Tunnels or Mesh nodes listed. The account's VPC binding does not establish private-network reachability.
 - Live runtime probes executed from a temporary Worker through the production-style `EGRESS` VPC binding and wrote results to the existing D1 database. Public HTTPS to `example.com` returned HTTP 200 in repeated runs. Direct loopback/private IPv4, IPv6 loopback/ULA/link-local, and hostnames resolving to private IPv4 were rejected with `ProxyError: destination_ip_prohibited`.
 - The IPv4 link-local probe timed out; its result is inconclusive.
-- A temporary test policy targeting a known public IP and temporary HTTP policies targeting a public host did not block the corresponding Worker requests. This means Gateway policy matching/attribution is **not proven**, and the private-address rejections cannot yet be attributed to the configured Gateway L4 rule. Do not treat these results as proof that Gateway is enforcing the configured CIDR policy.
+- Gateway analytics confirmed the Worker requests use the Workers VPC on-ramp and Internet off-ramp. The original rule's VNet selector could not match because the observed `virtualNetworkId` was empty; analytics also showed no applied rule ID on those sessions. The rule has been changed to use the observed Workers VPC on-ramp selector. The new selector still requires a post-propagation test showing the configured rule ID and a block action. Do not treat the runtime `destination_ip_prohibited` rejections alone as proof that Gateway enforced the CIDR policy.
 - Gateway activity logging is enabled with DNS, HTTP, and L4 events and PII redaction. The relevant Gateway activity records still need to be inspected in Zero Trust > Insights > Logs, including Traffic Source, Traffic Destination, policy action, and rule name. Workers Observability logs alone do not prove Gateway enforcement.
-- The Zero Trust account currently has no Gateway locations, TLS inspection is disabled, and the Gateway certificate binding reports `pending_deployment`. These are additional configuration facts to investigate while diagnosing why the temporary HTTP/L4 policy probes did not match; no causal conclusion has been established.
-- The temporary diagnostic Worker, temporary Gateway test rules, GitHub Actions workflow, and D1 probe table were removed after testing. The persistent scanner VNet and intended non-public-destination L4 policy were left intact.
+- The Zero Trust account currently has no Gateway locations, TLS inspection is disabled, and the Gateway certificate binding reports `pending_deployment`. These are additional configuration facts to account for while verifying policy behavior; no causal conclusion has been established.
+- The temporary diagnostic Worker, its cron trigger and subdomain, temporary Gateway test rules, temporary GitHub Actions workflows, and D1 probe table were removed after testing. The production Worker, scanner VNet, and corrected persistent L4 policy were left intact.
 
 ## Critical limitations (not production-safe)
 1. The production Worker has an EGRESS binding, but scanner readiness remains disabled.
