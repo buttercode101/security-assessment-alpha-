@@ -4,8 +4,10 @@ import { readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../worker.js", import.meta.url), "utf8");
 
-test("scan route is closed unless the explicit isolation gate is true", () => {
-  assert.match(source, /if\(e\.SCAN_EGRESS_READY!==true\)return json\(\{error:/);
+test("scan route requires both the release flag and the dedicated EGRESS binding", () => {
+  assert.match(source, /if\(!e\.EGRESS\|\|e\.SCAN_EGRESS_READY!=="enabled"\)return json\(\{error:/);
+  assert.match(source, /e\.EGRESS\.fetch\(t\.url/);
+  assert.doesNotMatch(source, /const res=await fetch\(t\.url/);
 });
 
 test("ownership proof is DNS TXT only", () => {
