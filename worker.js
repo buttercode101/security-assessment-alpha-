@@ -28,10 +28,11 @@ async function readLimitedText(response,limit){
 }
 export function classifyDnsAnswers(a,b){
  const records=[...(Array.isArray(a)?a:[]),...(Array.isArray(b)?b:[])].filter(x=>(x.type===1||x.type===28)&&typeof x.data==="string");
- const addresses=[...new Set(records.map(x=>x.data))].slice(0,10);
- if(!addresses.length)return{status:"no-record",addresses:[]};
- const unsafe=addresses.some(ip=>ip.includes(":")?!public6(ip):!public4(ip));
- return{status:unsafe?"reserved-address":"public-dns",addresses};
+ const allAddresses=[...new Set(records.map(x=>x.data))];
+ if(!allAddresses.length)return{status:"no-record",addresses:[]};
+ // Inspect every answer for unsafe destinations; cap only the display payload.
+ const unsafe=allAddresses.some(ip=>ip.includes(":")?!public6(ip):!public4(ip));
+ return{status:unsafe?"reserved-address":"public-dns",addresses:allAddresses.slice(0,10)};
 }
 export function extractCtAssets(records, root){
  const domain=String(root).toLowerCase().replace(/\.$/,"");
