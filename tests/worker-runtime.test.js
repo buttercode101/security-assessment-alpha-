@@ -5,6 +5,7 @@ import worker, { public4, public6, extractCtAssets } from "../worker.js";
 
 function makeEnv() {
   const writes = [];
+  const env = {};
   const db = {
     prepare(sql) {
       let values = [];
@@ -14,7 +15,7 @@ function makeEnv() {
           if (sql.includes("SELECT id FROM workspaces WHERE token_hash")) return { id: "workspace-test" };
           if (sql.includes("SELECT id FROM targets WHERE workspace_id")) return null;
           if (sql.includes("SELECT id FROM targets WHERE id=? AND workspace_id=?")) return values[0] === "00000000-0000-4000-8000-000000000000" ? { id: values[0] } : null;
-          if (sql.includes("SELECT * FROM targets WHERE id=? AND workspace_id=?")) return { id: "00000000-0000-4000-8000-000000000000", verified_at: "2026-11-11T00:00:00.000Z", last_scan_at: null, hostname: "example.org", url: "https://example.org" };
+          if (sql.includes("SELECT * FROM targets WHERE id=? AND workspace_id=?")) return { id: "00000000-0000-4000-8000-000000000000", verified_at: env.TEST_UNVERIFIED ? null : "2026-11-11T00:00:00.000Z", last_scan_at: null, last_discovery_at: env.TEST_COOLDOWN ? new Date().toISOString() : null, hostname: "example.org", url: "https://example.org" };
           if (sql.includes("SELECT COUNT(*) n FROM targets")) return { n: 0 };
           return null;
         },
@@ -23,7 +24,8 @@ function makeEnv() {
       };
     }
   };
-  return { env: { DB: db }, writes };
+  env.DB = db;
+  return { env, writes };
 }
 
 async function createSession(env) {
@@ -263,6 +265,52 @@ test("asset discovery is available only after ownership verification and stores 
     assert.match(body.note, /do not confirm that a host is currently live/);
     assert.equal(writes.filter(x => x.sql.includes("INSERT INTO discovered_assets")).length, 2);
     assert.ok(writes.some(x => x.sql.includes("UPDATE targets SET last_discovery_at")));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+
+test("passive asset discovery refuses targets without verified ownership", async () => {
+  const { env } = makeEnv();
+  env.TEST_UNVERIFIED = true;
+  const cookie = await createSession(env);
+  const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/discover", {
+    method: "POST",
+    headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+    body: "{}"
+  }), env);
+  assert.equal(response.status, 403);
+  assert.match((await response.json()).error, /Verify domain ownership/);
+});
+
+test("passive asset discovery enforces the per-target cooldown", async () => {
+  const { env } = makeEnv();
+  env.TEST_COOLDOWN = true;
+  const cookie = await createSession(env);
+  const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/discover", {
+    method: "POST",
+    headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+    body: "{}"
+  }), env);
+  assert.equal(response.status, 429);
+  assert.match((await response.json()).error, /once per hour/);
+});
+
+test("passive asset discovery stops oversized upstream responses before parsing", async () => {
+  const { env, writes } = makeEnv();
+  const cookie = await createSession(env);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response("x".repeat(2000001), { status: 200 });
+  try {
+    const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/discover", {
+      method: "POST",
+      headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+      body: "{}"
+    }), env);
+    assert.equal(response.status, 502);
+    assert.match((await response.json()).error, /2 MB safety limit/);
+    assert.equal(writes.some(item => item.sql.includes("INSERT INTO discovered_assets")), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
