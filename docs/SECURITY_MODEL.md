@@ -8,32 +8,37 @@
 - DNS A/AAAA preflight rejects malformed literals and common special-purpose ranges. This is conservative but not a complete IANA registry and is not, by itself, an SSRF control.
 - Redirects are not followed.
 - Non-GET API calls require an exact Origin match.
-- The scan route requires both an `EGRESS` VPC binding and `SCAN_EGRESS_READY=enabled`. The binding is now configured, but the readiness flag remains absent, so scans remain paused.
+- The scan route requires both an `EGRESS` VPC binding and `SCAN_EGRESS_READY=enabled`. The binding is configured, but the readiness flag remains absent, so scans remain paused.
 - No crawling, exploit payloads, authentication bypass, load generation, stress tests, or DDoS.
 
 ## Current scanner infrastructure
 - Cloudflare Access/Zero Trust is enabled.
 - Dedicated virtual network: `secops-scanner-egress`, ID `9c798b90-809b-4f60-b7a1-b11105f71c4e`.
-- That network is configured as the account default network. The production Worker binding is `EGRESS` with `network_id = "cf1:network"`, which is the documented Workers VPC path for public Internet egress through Cloudflare Gateway.
-- An enabled Gateway L4 block policy is scoped to that VNet and the Internet off-ramp. It blocks configured private, loopback, link-local, shared, documentation, benchmark, multicast, reserved, transition, and non-global IPv4/IPv6 destination ranges.
+- That network is configured as the account default network. The production Worker binding is `EGRESS` with `network_id = "cf1:network"`, the documented Workers VPC path for public Internet egress through Cloudflare Gateway.
+- An enabled Gateway L4 block policy is scoped to that VNet and the Internet off-ramp. It is configured to block loopback, private, link-local, shared, documentation, benchmark, multicast, reserved, transition, and non-global IPv4/IPv6 destination ranges.
 - The production Worker has the D1 binding and VPC binding attached. This configuration has been verified through the Cloudflare API.
-- The account currently has no Cloudflare Tunnels listed. Cloudflare's VPC documentation describes the default-network path and notes that an active Tunnel, Mesh node, or WAN on-ramp is required for access to private network services. Do not assume that a VPC binding alone proves public egress is operational.
-- A temporary fixed-destination diagnostic Worker and a temporary GitHub Actions probe were created to test public HTTPS reachability and private IPv4/IPv6 destinations, including hostnames that resolve to private IPs. The browser automation provider could not execute because its wallet balance is negative, and the local runtime has no external DNS/network access. Therefore, live network-level results are still unverified. Remove temporary probe resources after completing verification.
-- Cloudflare documents that Workers VPC public Internet traffic can pass through Gateway and that Gateway policies/logs apply to Workers VPC traffic. The documented Gateway public-egress path uses `cf1:network`; the explicit VNet is the account default network here.
+- The account currently has no Cloudflare Tunnels or Mesh nodes listed. The account's VPC binding does not establish private-network reachability.
+- Live runtime probes executed from a temporary Worker through the production-style `EGRESS` VPC binding and wrote results to the existing D1 database. Public HTTPS to `example.com` returned HTTP 200 in repeated runs. Direct loopback/private IPv4, IPv6 loopback/ULA/link-local, and hostnames resolving to private IPv4 were rejected with `ProxyError: destination_ip_prohibited`.
+- The IPv4 link-local probe timed out; its result is inconclusive.
+- A temporary test policy targeting a known public IP and temporary HTTP policies targeting a public host did not block the corresponding Worker requests. This means Gateway policy matching/attribution is **not proven**, and the private-address rejections cannot yet be attributed to the configured Gateway L4 rule. Do not treat these results as proof that Gateway is enforcing the configured CIDR policy.
+- Gateway activity logging is enabled with DNS, HTTP, and L4 events and PII redaction. The relevant Gateway activity records still need to be inspected in Zero Trust > Insights > Logs, including Traffic Source, Traffic Destination, policy action, and rule name. Workers Observability logs alone do not prove Gateway enforcement.
+- The temporary diagnostic Worker, test policies, GitHub Actions workflow, and D1 probe table are disposable test resources and must be removed after verification.
 
 ## Critical limitations (not production-safe)
 1. The production Worker has an EGRESS binding, but scanner readiness remains disabled.
-2. Public HTTPS success and private IPv4/IPv6 blocking have not yet been demonstrated from the deployed Worker runtime.
-3. DNS preflight is a separate lookup from the eventual connection. Gateway policy enforcement at connection time is required; preflight alone is not sufficient.
-4. The anonymous browser workspace can be lost when browser data is cleared and is not a multi-user identity system.
-5. No global abuse controls, bot controls, account auth, RBAC, MFA, or abuse response process.
-6. Interactive browser flows and DNS ownership verification have not yet been independently exercised end-to-end. CI verifies the live health endpoint, live dashboard HTML, CSP nonce, required sections, and parses the live client script.
+2. Public HTTPS success and runtime private-address rejection have been demonstrated; Gateway policy attribution and enforcement have not.
+3. IPv4 link-local behavior remains unverified.
+4. DNS preflight is a separate lookup from the eventual connection. Gateway policy enforcement at connection time is required; preflight alone is not sufficient.
+5. The anonymous browser workspace can be lost when browser data is cleared and is not a multi-user identity system.
+6. No global abuse controls, bot controls, account auth, RBAC, MFA, or abuse response process.
+7. Interactive browser flows and DNS ownership verification have not yet been independently exercised end-to-end. CI verifies the live health endpoint, live dashboard HTML, CSP nonce, required sections, and parses the live client script.
 
 ## Required before enabling scans
-- Prove the deployed Worker's `EGRESS.fetch()` reaches a known public HTTPS destination.
+- Keep the deployed Worker's `EGRESS.fetch()` public HTTPS path working.
 - Prove Gateway blocks loopback, RFC1918, CGNAT, link-local, documentation, benchmark, multicast, reserved, transition, IPv4-mapped IPv6, and other non-global IPv4/IPv6 destinations.
-- Prove hostnames resolving to private or mixed public/private A/AAAA answers cannot bypass the Gateway block (DNS rebinding).
-- Verify Gateway Network logs attribute the requests to Workers VPC and show policy enforcement.
+- Prove hostnames resolving to private or mixed public/private A/AAAA answers cannot bypass the destination block (DNS rebinding).
+- Verify Gateway Network/HTTP logs attribute requests to Workers VPC and show the expected policy enforcement and rule name.
+- Investigate why temporary public-destination Gateway policies did not match the probe requests before enabling the scanner.
 - Keep redirects disabled; if redirect support is ever added, revalidate every destination.
 - Restrict protocol and port to HTTPS/443.
 - Add global and per-workspace/per-target rate limits, concurrency caps, request timeouts, response byte caps and an emergency stop.
