@@ -34,7 +34,9 @@ jobs:
           assert.deepEqual(await healthResponse.json(), {
             ok: true,
             service: "security-assessment-alpha",
-            mode: "passive-only"
+            mode: "passive-only",
+            scanner_state: "paused",
+            egress: "gateway-vpc"
           });
 
           assert.equal(pageResponse.status, 200, "live dashboard must return 200");
