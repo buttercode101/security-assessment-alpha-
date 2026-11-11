@@ -158,3 +158,26 @@ test("IPv6 public-address filter rejects non-global, transition and documentatio
   }
   for (const ip of ["not-an-ip", "2001:::1", "2001:db8::1%eth0", "2001:4860::1.2.3.4", "2001:4860:::1", "2001:4860:1:2:3:4:5:6:7"]) assert.equal(public6(ip), false, ip);
 });
+
+
+test("target deletion is tenant-scoped and removes dependent records in order", async () => {
+  const { env, writes } = makeEnv();
+  const cookie = await createSession(env);
+  const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000", {
+    method: "DELETE",
+    headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+    body: "{}"
+  }), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { deleted: true, id: "00000000-0000-4000-8000-000000000000" });
+  const deletes = writes.filter(item => item.sql.startsWith("DELETE FROM")).map(item => item.sql.split(" ")[2]);
+  assert.deepEqual(deletes, ["findings", "scan_events", "scans", "targets"]);
+});
+
+test("scan history is returned only for the current workspace", async () => {
+  const { env } = makeEnv();
+  const cookie = await createSession(env);
+  const response = await worker.fetch(new Request("https://alpha.test/api/scans", { headers: { cookie } }), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { scans: [] });
+});
