@@ -173,7 +173,7 @@ test("target deletion is tenant-scoped and removes dependent records in order", 
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { deleted: true, id: "00000000-0000-4000-8000-000000000000" });
   const deletes = writes.filter(item => item.sql.startsWith("DELETE FROM")).map(item => item.sql.split(" ")[2]);
-  assert.deepEqual(deletes, ["findings", "scan_events", "scans", "targets"]);
+  assert.deepEqual(deletes, ["findings", "discovered_assets", "scan_events", "scans", "targets"]);
 });
 
 test("scan history is returned only for the current workspace", async () => {
