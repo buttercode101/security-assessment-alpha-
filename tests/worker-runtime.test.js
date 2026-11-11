@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker from "../worker.js";
+import worker, { public4, public6 } from "../worker.js";
 
 function makeEnv() {
   const writes = [];
@@ -130,4 +130,31 @@ test("dashboard response uses a fresh nonce for inline assets and a restrictive 
   assert.match(html, new RegExp('<script nonce="' + nonce + '">'));
   assert.doesNotMatch(csp, /unsafe-inline/);
   assert.notEqual(csp, second.headers.get("content-security-policy"), "nonce should rotate per response");
+});
+
+
+test("IPv4 public-address filter rejects special-purpose and documentation ranges precisely", () => {
+  for (const ip of [
+    "0.1.2.3", "10.1.2.3", "100.64.0.1", "100.127.255.254",
+    "127.0.0.1", "169.254.1.1", "172.16.0.1", "172.31.255.254",
+    "192.0.0.1", "192.0.2.1", "192.88.99.1", "192.168.1.1",
+    "198.18.0.1", "198.19.255.254", "198.51.100.1", "203.0.113.1",
+    "224.0.0.1", "240.0.0.1", "255.255.255.255"
+  ]) assert.equal(public4(ip), false, ip);
+  for (const ip of ["1.1.1.1", "8.8.8.8", "100.63.255.255", "100.128.0.1", "198.51.99.1", "198.52.0.1", "203.0.112.1"]) {
+    assert.equal(public4(ip), true, ip);
+  }
+  for (const ip of ["999.1.1.1", "1.2.3", "1.2.3.4.5", "1.a.3.4"]) assert.equal(public4(ip), false, ip);
+});
+
+test("IPv6 public-address filter rejects non-global, transition and documentation ranges", () => {
+  for (const ip of [
+    "::1", "fc00::1", "fd12::1", "fe80::1", "ff02::1",
+    "2001:0:1::1", "2001:db8::1", "2002:c000:0201::1",
+    "3fff:0001::1", "::ffff:8.8.8.8"
+  ]) assert.equal(public6(ip), false, ip);
+  for (const ip of ["2606:4700:4700::1111", "2001:4860:4860::8888", "2a00:1450::1", "3fff:1000::1"]) {
+    assert.equal(public6(ip), true, ip);
+  }
+  for (const ip of ["not-an-ip", "2001:::1", "2001:db8::1%eth0", "2001:4860::1.2.3.4"]) assert.equal(public6(ip), false, ip);
 });
