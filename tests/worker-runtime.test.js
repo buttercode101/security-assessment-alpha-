@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import worker, { public4, public6, extractCtAssets } from "../worker.js";
+import worker, { public4, public6, extractCtAssets, classifyDnsAnswers } from "../worker.js";
 
 function makeEnv() {
   const writes = [];
@@ -15,6 +15,7 @@ function makeEnv() {
           if (sql.includes("SELECT id FROM workspaces WHERE token_hash")) return { id: "workspace-test" };
           if (sql.includes("SELECT id FROM targets WHERE workspace_id")) return null;
           if (sql.includes("SELECT id FROM targets WHERE id=? AND workspace_id=?")) return values[0] === "00000000-0000-4000-8000-000000000000" ? { id: values[0] } : null;
+          if (sql.includes("SELECT a.id,a.hostname,a.dns_checked_at")) return { id: values[0], hostname: "api.example.org", dns_checked_at: env.TEST_DNS_COOLDOWN ? new Date().toISOString() : null, verified_at: env.TEST_DNS_UNVERIFIED ? null : "2026-11-11T00:00:00.000Z" };
           if (sql.includes("SELECT * FROM targets WHERE id=? AND workspace_id=?")) return { id: "00000000-0000-4000-8000-000000000000", verified_at: env.TEST_UNVERIFIED ? null : "2026-11-11T00:00:00.000Z", last_scan_at: null, last_discovery_at: env.TEST_COOLDOWN ? new Date().toISOString() : null, hostname: "example.org", url: "https://example.org" };
           if (sql.includes("SELECT COUNT(*) n FROM targets")) return { n: 0 };
           return null;
@@ -314,4 +315,66 @@ test("passive asset discovery stops oversized upstream responses before parsing"
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+
+test("DNS answer classification distinguishes public, reserved and absent records", () => {
+  assert.deepEqual(classifyDnsAnswers([{ type: 1, data: "93.184.216.34" }], [{ type: 28, data: "2606:4700:4700::1111" }]), {
+    status: "public-dns",
+    addresses: ["93.184.216.34", "2606:4700:4700::1111"]
+  });
+  assert.deepEqual(classifyDnsAnswers([{ type: 1, data: "10.0.0.5" }], []), {
+    status: "reserved-address",
+    addresses: ["10.0.0.5"]
+  });
+  assert.deepEqual(classifyDnsAnswers([], []), { status: "no-record", addresses: [] });
+});
+
+test("passive DNS check stores answers without connecting to the discovered host", async () => {
+  const { env, writes } = makeEnv();
+  const cookie = await createSession(env);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const type = new URL(String(url)).searchParams.get("type");
+    return new Response(JSON.stringify({ Answer: type === "A" ? [{ type: 1, data: "93.184.216.34" }] : [] }), { status: 200 });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://alpha.test/api/assets/00000000-0000-4000-8000-000000000001/dns", {
+      method: "POST",
+      headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+      body: "{}"
+    }), env);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.status, "public-dns");
+    assert.deepEqual(body.addresses, ["93.184.216.34"]);
+    assert.match(body.note, /not proof that an HTTP service is reachable/);
+    assert.ok(writes.some(item => item.sql.includes("UPDATE discovered_assets SET dns_status")));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("passive DNS check requires verified parent ownership", async () => {
+  const { env } = makeEnv();
+  env.TEST_DNS_UNVERIFIED = true;
+  const cookie = await createSession(env);
+  const response = await worker.fetch(new Request("https://alpha.test/api/assets/00000000-0000-4000-8000-000000000001/dns", {
+    method: "POST",
+    headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+    body: "{}"
+  }), env);
+  assert.equal(response.status, 403);
+});
+
+test("passive DNS check enforces a five-minute cooldown", async () => {
+  const { env } = makeEnv();
+  env.TEST_DNS_COOLDOWN = true;
+  const cookie = await createSession(env);
+  const response = await worker.fetch(new Request("https://alpha.test/api/assets/00000000-0000-4000-8000-000000000001/dns", {
+    method: "POST",
+    headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+    body: "{}"
+  }), env);
+  assert.equal(response.status, 429);
 });
