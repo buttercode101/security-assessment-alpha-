@@ -1,5 +1,7 @@
 # Security model and release gates
 
+<!-- Temporary verification trigger; removed after test. -->
+
 ## Current alpha boundaries
 - Browser-bound anonymous workspace cookie; no account identity, MFA, RBAC, or team membership.
 - Workspace token is high entropy and only its SHA-256 hash is stored.
