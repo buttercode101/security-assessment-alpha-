@@ -12,7 +12,7 @@ function makeEnv() {
         async first() {
           if (sql.includes("SELECT id FROM workspaces WHERE token_hash")) return { id: "workspace-test" };
           if (sql.includes("SELECT id FROM targets WHERE workspace_id")) return null;
-          if (sql.includes("SELECT id FROM targets WHERE id=? AND workspace_id=?")) return { id: "00000000-0000-4000-8000-000000000000" };
+          if (sql.includes("SELECT id FROM targets WHERE id=? AND workspace_id=?")) return values[0] === "00000000-0000-4000-8000-000000000000" ? { id: values[0] } : null;
           if (sql.includes("SELECT * FROM targets WHERE id=? AND workspace_id=?")) return { id: "00000000-0000-4000-8000-000000000000", verified_at: "2026-11-11T00:00:00.000Z", last_scan_at: null, hostname: "example.org", url: "https://example.org" };
           if (sql.includes("SELECT COUNT(*) n FROM targets")) return { n: 0 };
           return null;
