@@ -1,6 +1,6 @@
 # Security model and release gates
 
-<!-- Temporary verification trigger; rerun after after removing temporary IPv6 rule. -->
+<!-- Temporary verification trigger; rerun after after Gateway propagation wait. -->
 
 ## Current alpha boundaries
 - Browser-bound anonymous workspace cookie; no account identity, MFA, RBAC, or team membership.
