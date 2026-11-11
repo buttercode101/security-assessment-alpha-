@@ -20,4 +20,4 @@ Never commit an API token or put it in `wrangler.toml`.
 The current version was uploaded through the connected Cloudflare account API after fetching the exact `worker.js` file from GitHub. The deployed Worker version was verified in the Cloudflare deployment list with 100% traffic.
 
 ## Important
-The deployment workflow does not enable scanning. Do not add `SCAN_EGRESS_READY` to Wrangler variables until the isolated scanner runner and egress controls are implemented and independently tested.
+The current production release has `SCAN_EGRESS_READY=enabled` after public HTTPS egress, private-destination rejection, DNS-to-private rejection and a controlled Gateway L4 policy A/B test. The Worker still requires a DNS-TXT-verified target, and its assessment scope remains one passive HTTPS GET with redirects disabled. Do not broaden scan scope until the remaining security-model release gates are independently validated.
