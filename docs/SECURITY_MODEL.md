@@ -8,29 +8,33 @@
 - DNS A/AAAA preflight rejects malformed literals and common special-purpose ranges. This is conservative but not a complete IANA registry and is not, by itself, an SSRF control.
 - Redirects are not followed.
 - Non-GET API calls require an exact Origin match.
-- The scan route requires both an `EGRESS` VPC binding and `SCAN_EGRESS_READY=enabled`. Neither is configured in production, so scans remain paused.
+- The scan route requires both an `EGRESS` VPC binding and `SCAN_EGRESS_READY=enabled`. The binding is now configured, but the readiness flag remains absent, so scans remain paused.
 - No crawling, exploit payloads, authentication bypass, load generation, stress tests, or DDoS.
 
-## Current scanner infrastructure decision
-- The preferred low-cost route is Cloudflare Workers VPC plus a dedicated Gateway L4 policy. Cloudflare documents Workers VPC as available on Free and Paid plans while in beta, and documents Gateway policies applying to Worker-originated internet traffic.
-- The connected account has not enabled Access/Zero Trust. The Gateway API returned `access.api.error.not_enabled` and instructed an administrator to enable Access in the Cloudflare dashboard.
-- A temporary dedicated virtual network was created while testing the API and immediately deleted after Gateway policy creation was rejected. The account currently has no virtual networks or Gateway rules.
-- Do not add the `EGRESS` binding or set `SCAN_EGRESS_READY=enabled` until Access is enabled, a dedicated virtual network is created, and a scoped Gateway policy blocks private, loopback, link-local, CGNAT, documentation, multicast, reserved, transition, and non-global destination ranges.
-- Before opening the gate, independently prove that public HTTPS destinations work and private IPv4/IPv6 destinations are blocked at the network layer, including DNS-rebinding attempts. The scanner must continue to reject redirects and use HTTPS/443 only.
+## Current scanner infrastructure
+- Cloudflare Access/Zero Trust is enabled.
+- Dedicated virtual network: `secops-scanner-egress`, ID `9c798b90-809b-4f60-b7a1-b11105f71c4e`.
+- That network is configured as the account default network. The production Worker binding is `EGRESS` with `network_id = "cf1:network"`, which is the documented Workers VPC path for public Internet egress through Cloudflare Gateway.
+- An enabled Gateway L4 block policy is scoped to that VNet and the Internet off-ramp. It blocks configured private, loopback, link-local, shared, documentation, benchmark, multicast, reserved, transition, and non-global IPv4/IPv6 destination ranges.
+- The production Worker has the D1 binding and VPC binding attached. This configuration has been verified through the Cloudflare API.
+- The account currently has no Cloudflare Tunnels listed. Cloudflare's VPC documentation describes the default-network path and notes that an active Tunnel, Mesh node, or WAN on-ramp is required for access to private network services. Do not assume that a VPC binding alone proves public egress is operational.
+- A temporary fixed-destination diagnostic Worker and a temporary GitHub Actions probe were created to test public HTTPS reachability and private IPv4/IPv6 destinations, including hostnames that resolve to private IPs. The browser automation provider could not execute because its wallet balance is negative, and the local runtime has no external DNS/network access. Therefore, live network-level results are still unverified. Remove temporary probe resources after completing verification.
+- Cloudflare documents that Workers VPC public Internet traffic can pass through Gateway and that Gateway policies/logs apply to Workers VPC traffic. The documented Gateway public-egress path uses `cf1:network`; the explicit VNet is the account default network here.
 
 ## Critical limitations (not production-safe)
-1. The production Worker currently has no `EGRESS` binding. The health endpoint reports `scanner_state: paused`.
-2. DNS preflight is a separate lookup from the eventual connection. The future Gateway policy is required to block non-public destinations at connection time; preflight alone is not sufficient.
-3. The anonymous browser workspace can be lost when browser data is cleared and is not a multi-user identity system.
-4. No global abuse controls, bot controls, account auth, RBAC, MFA, or abuse response process.
-5. Interactive browser flows and DNS ownership verification have not yet been independently exercised end-to-end. CI verifies the live health endpoint, live dashboard HTML, CSP nonce, required sections, and parses the live client script.
+1. The production Worker has an EGRESS binding, but scanner readiness remains disabled.
+2. Public HTTPS success and private IPv4/IPv6 blocking have not yet been demonstrated from the deployed Worker runtime.
+3. DNS preflight is a separate lookup from the eventual connection. Gateway policy enforcement at connection time is required; preflight alone is not sufficient.
+4. The anonymous browser workspace can be lost when browser data is cleared and is not a multi-user identity system.
+5. No global abuse controls, bot controls, account auth, RBAC, MFA, or abuse response process.
+6. Interactive browser flows and DNS ownership verification have not yet been independently exercised end-to-end. CI verifies the live health endpoint, live dashboard HTML, CSP nonce, required sections, and parses the live client script.
 
 ## Required before enabling scans
-- Enable Cloudflare Access/Zero Trust in the account dashboard.
-- Create a dedicated VPC network and a Gateway L4 block policy scoped only to that network.
-- Bind the Worker to that VPC network using `EGRESS`; verify Gateway logs show the scanner's traffic.
-- Enforce destination IP policy at the network layer; resolve and validate all A/AAAA/CNAME answers and reject mixed public/private sets.
-- Revalidate every redirect and default to not following redirects.
+- Prove the deployed Worker's `EGRESS.fetch()` reaches a known public HTTPS destination.
+- Prove Gateway blocks loopback, RFC1918, CGNAT, link-local, documentation, benchmark, multicast, reserved, transition, IPv4-mapped IPv6, and other non-global IPv4/IPv6 destinations.
+- Prove hostnames resolving to private or mixed public/private A/AAAA answers cannot bypass the Gateway block (DNS rebinding).
+- Verify Gateway Network logs attribute the requests to Workers VPC and show policy enforcement.
+- Keep redirects disabled; if redirect support is ever added, revalidate every destination.
 - Restrict protocol and port to HTTPS/443.
 - Add global and per-workspace/per-target rate limits, concurrency caps, request timeouts, response byte caps and an emergency stop.
 - Separate control plane from scanner runtime and use a durable queue before adding crawling or broader checks.
