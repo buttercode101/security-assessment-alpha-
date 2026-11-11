@@ -227,9 +227,9 @@ test("dashboard client JavaScript parses and all referenced primary controls exi
 
 test("certificate transparency parser keeps only names inside the verified domain and deduplicates", () => {
   const assets = extractCtAssets([
-    { name_value: "api.example.org\\n*.staging.example.org\\nexample.org\\nnotexample.org\\nmail.other.net", not_before: "2025-01-01", not_after: "2025-04-01", issuer_name: "Issuer A" },
-    { name_value: "api.example.org\\nshop.example.org", not_before: "2026-01-01", not_after: "2026-04-01", issuer_name: "Issuer B" },
-    { name_value: "*.bad..example.org\\n-evil.example.org\\nfoo_example.org" }
+    { name_value: "api.example.org\n*.staging.example.org\nexample.org\nnotexample.org\nmail.other.net", not_before: "2025-01-01", not_after: "2025-04-01", issuer_name: "Issuer A" },
+    { name_value: "api.example.org\nshop.example.org", not_before: "2026-01-01", not_after: "2026-04-01", issuer_name: "Issuer B" },
+    { name_value: "*.bad..example.org\n-evil.example.org\nfoo_example.org" }
   ], "example.org");
   assert.deepEqual(assets.map(x => x.hostname), ["api.example.org", "shop.example.org", "staging.example.org"]);
   assert.equal(assets[0].certificate_not_before, "2026-01-01");
@@ -237,7 +237,7 @@ test("certificate transparency parser keeps only names inside the verified domai
 });
 
 test("certificate transparency parser enforces hostname boundaries", () => {
-  assert.deepEqual(extractCtAssets([{ name_value: "example.org\\nnotexample.org\\nsub.example.org.attacker.net" }], "example.org"), []);
+  assert.deepEqual(extractCtAssets([{ name_value: "example.org\nnotexample.org\nsub.example.org.attacker.net" }], "example.org"), []);
 });
 
 test("asset discovery is available only after ownership verification and stores passive CT evidence", async () => {
@@ -246,7 +246,7 @@ test("asset discovery is available only after ownership verification and stores 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
     assert.match(String(url), /^https:\\/\\/crt\\.sh\\//);
-    return new Response(JSON.stringify([{ name_value: "api.example.org\\nshop.example.org", not_before: "2026-01-01", not_after: "2026-04-01", issuer_name: "Test CA" }]), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify([{ name_value: "api.example.org\nshop.example.org", not_before: "2026-01-01", not_after: "2026-04-01", issuer_name: "Test CA" }]), { status: 200, headers: { "content-type": "application/json" } });
   };
   try {
     const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/discover", {
