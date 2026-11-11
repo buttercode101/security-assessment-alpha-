@@ -15,5 +15,6 @@ binding = "EGRESS"
 network_id = "cf1:network"
 remote = true
 
-# Intentionally do not define SCAN_EGRESS_READY.
-# Enable only after real public-egress and private-destination tests pass.
+[vars]
+# Enabled after live public-egress, Gateway block and private-destination tests.
+SCAN_EGRESS_READY = "enabled"
