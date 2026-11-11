@@ -47,6 +47,9 @@ jobs:
           for (const id of ["targets", "scans", "assets", "findings"]) {
             assert.ok(html.includes('id="' + id + '"'), "live dashboard is missing #" + id);
           }
+          for (const feature of ["Assessment history", "Discovered assets", "Discover assets", "Check DNS"]) {
+            assert.ok(html.includes(feature), "live dashboard is missing " + feature);
+          }
           const scriptStart = html.indexOf('<script nonce="' + nonce + '">');
           const bodyStart = html.indexOf(">", scriptStart) + 1;
           const scriptEnd = html.indexOf("</script>", bodyStart);
