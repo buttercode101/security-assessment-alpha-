@@ -46,3 +46,15 @@ test("responsive layout includes phone, tablet and compact-phone breakpoints", (
 test("reduced-motion preference is respected", () => {
   assert.match(source, /prefers-reduced-motion:reduce/);
 });
+
+test("assessment UI exposes the run action only when the health endpoint reports readiness", () => {
+  assert.match(source, /scannerReady=health\.scanner_state==="ready"/);
+  assert.match(source, /if\(scannerReady\)actions\.append\(button\("Run assessment"/);
+  assert.match(source, /\.notice\[hidden\]\{display:none\}/);
+});
+
+test("assessment UI submits only to the target's passive scan endpoint", () => {
+  assert.match(source, /async function runAssessment\(id,action\)/);
+  assert.match(source, /\/api\/targets\/"\+encodeURIComponent\(id\)\+"\/scan/);
+  assert.match(source, /redirect:"manual"/);
+});
