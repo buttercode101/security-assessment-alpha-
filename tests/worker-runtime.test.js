@@ -12,6 +12,7 @@ function makeEnv() {
         async first() {
           if (sql.includes("SELECT id FROM workspaces WHERE token_hash")) return { id: "workspace-test" };
           if (sql.includes("SELECT id FROM targets WHERE workspace_id")) return null;
+          if (sql.includes("SELECT * FROM targets WHERE id=? AND workspace_id=?")) return { id: "00000000-0000-4000-8000-000000000000", verified_at: "2026-11-11T00:00:00.000Z", last_scan_at: null, hostname: "example.org", url: "https://example.org" };
           if (sql.includes("SELECT COUNT(*) n FROM targets")) return { n: 0 };
           return null;
         },
@@ -103,7 +104,7 @@ test("valid HTTPS target is normalized to its origin and stored as pending verif
   assert.equal(insert.values[3], "example.org");
 });
 
-test("scan route remains unavailable even for an owned target unless isolation gate is explicitly true", async () => {
+test("scan route returns a pause response for an owned target while isolation gate is unset", async () => {
   const { env } = makeEnv();
   const cookie = await createSession(env);
   const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/scan", {
@@ -111,6 +112,7 @@ test("scan route remains unavailable even for an owned target unless isolation g
     headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
     body: "{}"
   }), env);
-  // The fake DB returns no target. This proves the route cannot proceed to scanner execution.
-  assert.equal(response.status, 404);
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /temporarily paused/);
+  assert.equal(env.SCAN_EGRESS_READY, undefined);
 });
