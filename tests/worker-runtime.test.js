@@ -12,6 +12,7 @@ function makeEnv() {
         async first() {
           if (sql.includes("SELECT id FROM workspaces WHERE token_hash")) return { id: "workspace-test" };
           if (sql.includes("SELECT id FROM targets WHERE workspace_id")) return null;
+          if (sql.includes("SELECT id FROM targets WHERE id=? AND workspace_id=?")) return { id: "00000000-0000-4000-8000-000000000000" };
           if (sql.includes("SELECT * FROM targets WHERE id=? AND workspace_id=?")) return { id: "00000000-0000-4000-8000-000000000000", verified_at: "2026-11-11T00:00:00.000Z", last_scan_at: null, hostname: "example.org", url: "https://example.org" };
           if (sql.includes("SELECT COUNT(*) n FROM targets")) return { n: 0 };
           return null;
@@ -180,4 +181,17 @@ test("scan history is returned only for the current workspace", async () => {
   const response = await worker.fetch(new Request("https://alpha.test/api/scans", { headers: { cookie } }), env);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { scans: [] });
+});
+
+
+test("target deletion does not disclose or delete another workspace target", async () => {
+  const { env, writes } = makeEnv();
+  const cookie = await createSession(env);
+  const response = await worker.fetch(new Request("https://alpha.test/api/targets/11111111-1111-4111-8111-111111111111", {
+    method: "DELETE",
+    headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+    body: "{}"
+  }), env);
+  assert.equal(response.status, 404);
+  assert.equal(writes.some(item => item.sql.startsWith("DELETE FROM")), false);
 });
