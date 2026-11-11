@@ -49,7 +49,7 @@
 
 ## Evidence
 
-- CI run: [43073306507](https://github.com/buttercode101/security-assessment-alpha-/actions/runs/43073306507) — 54/54 unit tests, live health/dashboard smoke and anonymous API lifecycle passed.
+- CI run: [43073532526](https://github.com/buttercode101/security-assessment-alpha-/actions/runs/43073532526) — 54/54 unit tests, live health/dashboard smoke and anonymous API lifecycle passed against the latest production Worker version.
 - CI status: `ci/full-validation = success`.
 - Production Worker source and release gate are committed in the repository; production deployment version and bindings were independently checked through the Cloudflare API.
 - Egress tests were executed using a temporary fixed-destination Worker, then that Worker and its temporary policy rules were removed.
