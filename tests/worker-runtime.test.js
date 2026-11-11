@@ -247,7 +247,7 @@ test("asset discovery is available only after ownership verification and stores 
   const cookie = await createSession(env);
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
-    assert.match(String(url), /^https:\\/\\/crt\\.sh\\//);
+    assert.ok(String(url).startsWith("https://crt.sh/"));
     return new Response(JSON.stringify([{ name_value: "api.example.org\nshop.example.org", not_before: "2026-01-01", not_after: "2026-04-01", issuer_name: "Test CA" }]), { status: 200, headers: { "content-type": "application/json" } });
   };
   try {
