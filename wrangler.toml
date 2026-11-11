@@ -7,5 +7,13 @@ binding = "DB"
 database_name = "secops-platform-core"
 database_id = "bb64e825-c896-4bdf-b301-36ae88dbdeaf"
 
+# Public Internet egress is routed through Cloudflare Gateway using the
+# account default network. The default network is mapped to the dedicated
+# secops-scanner-egress virtual network in Cloudflare.
+[[vpc_networks]]
+binding = "EGRESS"
+network_id = "cf1:network"
+remote = true
+
 # Intentionally do not define SCAN_EGRESS_READY.
-# Scanning must remain disabled until the isolated scanner architecture is implemented and tested.
+# Enable only after real public-egress and private-destination tests pass.
