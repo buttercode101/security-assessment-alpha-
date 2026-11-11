@@ -201,9 +201,9 @@ test("target deletion does not disclose or delete another workspace target", asy
 });
 
 
-test("string environment flag cannot open the boolean-only scan gate", async () => {
+test("string environment flag alone cannot open the Gateway egress scan gate", async () => {
   const { env } = makeEnv();
-  env.SCAN_EGRESS_READY = "true";
+  env.SCAN_EGRESS_READY = "enabled";
   const cookie = await createSession(env);
   const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/scan", {
     method: "POST",
@@ -377,4 +377,51 @@ test("passive DNS check enforces a five-minute cooldown", async () => {
     body: "{}"
   }), env);
   assert.equal(response.status, 429);
+});
+
+
+test("scanner requires both the release flag and an isolated EGRESS binding", async () => {
+  const { env } = makeEnv();
+  env.SCAN_EGRESS_READY = "enabled";
+  const cookie = await createSession(env);
+  const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/scan", {
+    method: "POST",
+    headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+    body: "{}"
+  }), env);
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /Gateway-isolated egress network/);
+});
+
+test("passive scan sends target request only through the EGRESS binding", async () => {
+  const { env, writes } = makeEnv();
+  env.SCAN_EGRESS_READY = "enabled";
+  let egressCalls = 0;
+  env.EGRESS = {
+    async fetch(url, init) {
+      egressCalls++;
+      assert.equal(url, "https://example.org");
+      assert.equal(init.redirect, "manual");
+      return new Response(null, { status: 200, headers: { "content-type": "text/html" } });
+    }
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    assert.ok(String(url).startsWith("https://cloudflare-dns.com/dns-query"));
+    const type = new URL(String(url)).searchParams.get("type");
+    return new Response(JSON.stringify({ Answer: type === "A" ? [{ type: 1, data: "93.184.216.34" }] : [] }), { status: 200 });
+  };
+  try {
+    const cookie = await createSession(env);
+    const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/scan", {
+      method: "POST",
+      headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+      body: "{}"
+    }), env);
+    assert.equal(response.status, 200);
+    assert.equal(egressCalls, 1);
+    assert.ok(writes.some(item => item.sql.includes("INSERT INTO scans")));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
