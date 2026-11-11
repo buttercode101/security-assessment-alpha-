@@ -33,9 +33,9 @@ Tests were executed from a temporary Worker using the same `cf1:network` VPC bin
 - Direct private IPv4, loopback, IPv6 loopback, IPv6 ULA, IPv6 link-local and a hostname resolving to private IPv4 returned `ProxyError: destination_ip_prohibited`.
 - The IPv4 link-local metadata probe timed out. That individual result is inconclusive; the range remains covered by the persistent Gateway policy.
 - Gateway analytics showed Worker VPC as the on-ramp and Internet as the off-ramp.
-- A controlled policy A/B test added a temporary L4 block rule for the exact public IPv6 addresses observed for `example.com`. The previously successful request then failed during TLS setup; after deleting the temporary rule, the request returned HTTP 200 again. This demonstrates that Gateway L4 policy enforcement can affect Workers VPC egress.
-- The temporary rule, diagnostic Worker and its workers.dev subdomain were deleted. The persistent non-public-destination rule was left enabled.
-- Sampled analytics did not expose a rule ID for the temporary blocked event. The persistent rule's exact rule-ID attribution should still be confirmed in Zero Trust > Insights > Logs before expanding beyond this narrow passive assessment.
+- A controlled policy A/B test added a temporary L4 block rule for the exact public IPv6 addresses observed for `example.com`. The previously successful request then failed during TLS setup; after deleting the temporary rule, the request returned HTTP 200 again.
+- Gateway L4 analytics recorded two `action: block` sessions with temporary test rule ID `9af7394d-d42a-4b23-8d00-5ed8624bdcd0`, on-ramp `workers_vpc`, off-ramp `internet`, and SNI `example.com`. This is direct evidence that Gateway L4 policy enforcement applies to Workers VPC egress.
+- The temporary rule, diagnostic Worker and its workers.dev subdomain were deleted. The persistent non-public-destination rule was left enabled. The temporary test rule ID is historical evidence only; it is not the ID of the persistent rule.
 
 The VPC proxy's `destination_ip_prohibited` responses show that the tested private/special-use destinations did not connect, but those errors alone do not identify which Cloudflare layer rejected each destination. The separate Gateway A/B test demonstrates that Gateway policy enforcement is on the egress path.
 
