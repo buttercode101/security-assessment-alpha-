@@ -116,3 +116,18 @@ test("scan route returns a pause response for an owned target while isolation ga
   assert.match((await response.json()).error, /temporarily paused/);
   assert.equal(env.SCAN_EGRESS_READY, undefined);
 });
+
+test("dashboard response uses a fresh nonce for inline assets and a restrictive CSP", async () => {
+  const { env } = makeEnv();
+  const first = await worker.fetch(new Request("https://alpha.test/"), env);
+  const second = await worker.fetch(new Request("https://alpha.test/"), env);
+  assert.equal(first.status, 200);
+  const html = await first.text();
+  const csp = first.headers.get("content-security-policy");
+  const nonce = csp.match(/script-src 'self' 'nonce-([^']+)'/)?.[1];
+  assert.ok(nonce, "CSP should define a script nonce");
+  assert.match(html, new RegExp('<style nonce="' + nonce + '">'));
+  assert.match(html, new RegExp('<script nonce="' + nonce + '">'));
+  assert.doesNotMatch(csp, /unsafe-inline/);
+  assert.notEqual(csp, second.headers.get("content-security-policy"), "nonce should rotate per response");
+});
