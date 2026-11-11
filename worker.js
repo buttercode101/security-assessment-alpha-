@@ -10,13 +10,13 @@ export function public6(s){s=String(s).toLowerCase();if(!s.includes(":")||/[.\s%
 async function dns(name,type){const r=await fetch("https://cloudflare-dns.com/dns-query?name="+encodeURIComponent(name)+"&type="+type,{headers:{accept:"application/dns-json"},signal:AbortSignal.timeout(4000)});if(!r.ok)throw Error("DNS lookup unavailable.");const d=await r.json();return d.Answer||[]}
 async function safeHost(host){const[a,b]=await Promise.all([dns(host,"A"),dns(host,"AAAA")]),ips=[...a.filter(x=>x.type===1),...b.filter(x=>x.type===28)];if(!ips.length)throw Error("Domain does not resolve to a public IP.");for(const x of ips)if(!(x.data.includes(":")?public6(x.data):public4(x.data)))throw Error("Assessment blocked: hostname resolves to a private or reserved address.")}
 export function extractCtAssets(records, root){
- const domain=String(root).toLowerCase().replace(/\\.$/,"");
+ const domain=String(root).toLowerCase().replace(/\.$/,"");
  if(!Array.isArray(records)||!domain)return[];
  const found=new Map();
  for(const record of records){
   if(!record||typeof record.name_value!=="string")continue;
-  for(let raw of record.name_value.split(/[\\r\\n,]+/)){
-   let host=raw.trim().toLowerCase().replace(/\\.$/,"");
+  for(let raw of record.name_value.split(/[\r\n,]+/)){
+   let host=raw.trim().toLowerCase().replace(/\.$/,"");
    if(host.startsWith("*."))host=host.slice(2);
    if(host===domain||!host.endsWith("."+domain)||host.length>253)continue;
    const labels=host.split(".");
