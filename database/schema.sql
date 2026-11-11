@@ -85,6 +85,9 @@ CREATE TABLE discovered_assets (
   certificate_not_before TEXT,
   certificate_not_after TEXT,
   issuer_name TEXT,
+  dns_status TEXT CHECK(dns_status IN ('public-dns','no-record','reserved-address')),
+  dns_checked_at TEXT,
+  dns_answers_json TEXT,
   UNIQUE(target_id, hostname)
 );
 
