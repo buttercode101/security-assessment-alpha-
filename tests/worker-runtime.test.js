@@ -195,3 +195,17 @@ test("target deletion does not disclose or delete another workspace target", asy
   assert.equal(response.status, 404);
   assert.equal(writes.some(item => item.sql.startsWith("DELETE FROM")), false);
 });
+
+
+test("string environment flag cannot open the boolean-only scan gate", async () => {
+  const { env } = makeEnv();
+  env.SCAN_EGRESS_READY = "true";
+  const cookie = await createSession(env);
+  const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/scan", {
+    method: "POST",
+    headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+    body: "{}"
+  }), env);
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /temporarily paused/);
+});
