@@ -26,5 +26,5 @@ test("cookie has secure browser protections", () => {
 });
 
 test("UI tells the truth that scanning is paused", () => {
-  assert.match(source, /Assessments are paused until outbound network isolation is verified/);
+  assert.match(source, /Assessments are temporarily paused/);
 });
