@@ -118,7 +118,7 @@ test("scan route returns a pause response for an owned target while isolation ga
     body: "{}"
   }), env);
   assert.equal(response.status, 503);
-  assert.match((await response.json()).error, /temporarily paused/);
+  assert.match((await response.json()).error, /Assessments are paused/);
   assert.equal(env.SCAN_EGRESS_READY, undefined);
 });
 
@@ -211,7 +211,7 @@ test("string environment flag alone cannot open the Gateway egress scan gate", a
     body: "{}"
   }), env);
   assert.equal(response.status, 503);
-  assert.match((await response.json()).error, /temporarily paused/);
+  assert.match((await response.json()).error, /Gateway-isolated egress network/);
 });
 
 
