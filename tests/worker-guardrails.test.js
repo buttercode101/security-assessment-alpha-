@@ -34,3 +34,13 @@ test("inline UI assets use per-response CSP nonces", () => {
   assert.match(source, /<script nonce="__CSP_NONCE__">/);
   assert.doesNotMatch(source, /'unsafe-inline'/);
 });
+
+test("responsive layout includes phone, tablet and compact-phone breakpoints", () => {
+  assert.match(source, /@media\(max-width:850px\)/);
+  assert.match(source, /@media\(max-width:560px\)/);
+  assert.match(source, /@media\(max-width:360px\)/);
+});
+
+test("reduced-motion preference is respected", () => {
+  assert.match(source, /prefers-reduced-motion:reduce/);
+});
