@@ -13,7 +13,7 @@
 - [x] Live dashboard returns 200, has a per-response CSP nonce, no unsafe-inline policy, and valid client JavaScript.
 - [x] Live dashboard includes target, history, asset, finding, DNS-check and Run assessment UI.
 - [x] Live anonymous API lifecycle: session without signup, target registration, duplicate rejection, unverified scan rejection, target deletion and absence after deletion.
-- [x] 52 Node tests passed in GitHub Actions at the time of the recorded run. Additional DNS TXT success/rejection tests are now in the latest CI run.
+- [x] 54 Node tests passed in GitHub Actions, including exact DNS TXT success and wrong-token rejection with mocked DNS answers.
 - [x] Public HTTPS through the production-style Workers VPC binding returned HTTP 200.
 - [x] Private IPv4, loopback, IPv6 loopback, IPv6 ULA, IPv6 link-local and DNS-to-private probes were rejected by the VPC proxy.
 - [x] Controlled Gateway L4 A/B test: a temporary block for the exact example.com IPv6 destinations made the request fail; removing the rule restored HTTP 200.
@@ -22,7 +22,7 @@
 
 ## Not yet independently verified
 
-- [ ] Successful DNS TXT ownership verification against a domain controlled by the project owner. No DNS zone for an owner-controlled test domain is attached to the connected Cloudflare account, and no registrar DNS-write integration is available in this workflow.
+- [ ] Successful DNS TXT ownership verification against a domain controlled by the project owner. Unit tests cover exact-token success and wrong-token rejection with mocked DNS answers, but no DNS zone for an owner-controlled test domain is attached to the connected Cloudflare account and no registrar DNS-write integration is available in this workflow.
 - [ ] A real owner-verified target run through the full UI journey: DNS TXT → passive assessment → history/findings → deletion. We will not scan a third-party domain or bypass the ownership proof to manufacture this result.
 - [ ] IPv4 link-local metadata probe: the request timed out, so the individual runtime result is inconclusive. The address range remains in the persistent Gateway CIDR block policy.
 - [ ] A direct block event for the persistent non-public-destination rule ID. The controlled temporary-rule A/B test proves Gateway enforcement on the Workers VPC path and exposes the temporary rule ID; private destinations also fail closed at the VPC proxy, so a persistent-rule match event has not yet been observed.
@@ -49,7 +49,7 @@
 
 ## Evidence
 
-- CI run: [43072854083](https://github.com/buttercode101/security-assessment-alpha-/actions/runs/43072854083) — 52/52 unit tests, live health/dashboard smoke and anonymous API lifecycle passed.
+- CI run: [43073306507](https://github.com/buttercode101/security-assessment-alpha-/actions/runs/43073306507) — 54/54 unit tests, live health/dashboard smoke and anonymous API lifecycle passed.
 - CI status: `ci/full-validation = success`.
 - Production Worker source and release gate are committed in the repository; production deployment version and bindings were independently checked through the Cloudflare API.
 - Egress tests were executed using a temporary fixed-destination Worker, then that Worker and its temporary policy rules were removed.
