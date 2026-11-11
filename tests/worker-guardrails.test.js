@@ -28,3 +28,9 @@ test("cookie has secure browser protections", () => {
 test("UI tells the truth that scanning is paused", () => {
   assert.match(source, /Assessments are temporarily paused/);
 });
+
+test("inline UI assets use per-response CSP nonces", () => {
+  assert.match(source, /<style nonce="__CSP_NONCE__">/);
+  assert.match(source, /<script nonce="__CSP_NONCE__">/);
+  assert.doesNotMatch(source, /'unsafe-inline'/);
+});
