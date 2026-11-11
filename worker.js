@@ -83,7 +83,7 @@ const PAGE = `<!doctype html>
 <section class="panel target-list" id="targets" aria-live="polite" aria-busy="true"><div class="empty"><strong>Loading workspace</strong>Retrieving your websites…</div></section>
 <div class="section-head"><h2 class="section-title">Assessment history</h2><span class="section-note">Latest 20 · Passive only</span></div>
 <section class="panel target-list" id="scans" aria-live="polite"><div class="empty"><strong>No assessments yet</strong>Completed assessment records will appear here.</div></section>
-<div class="section-head"><h2 class="section-title">Discovered assets</h2><span class="section-note">crt.sh certificate records · passive · no host probes</span></div>
+<div class="section-head"><h2 class="section-title">Discovered assets</h2><span class="section-note">crt.sh + DNS resolver · passive · no HTTP/port probes</span></div>
 <section class="panel target-list" id="assets" aria-live="polite"><div class="empty"><strong>No discovered assets yet</strong>Verify a website, then discover names present in public certificate records.</div></section>
 <div class="section-head"><h2 class="section-title">Latest observations</h2><span class="section-note">Evidence-led · Passive checks</span></div>
 <section class="panel findings" id="findings" aria-live="polite"><div class="empty"><strong>No observations yet</strong>Verified website assessments will appear here once scanning is safely enabled.</div></section>
