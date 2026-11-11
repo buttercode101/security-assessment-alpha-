@@ -21,6 +21,10 @@ Private-alpha security configuration assessment platform. Cloudflare Workers + D
 
 Certificate Transparency discovery sends the verified hostname to crt.sh, a public third-party certificate search service. DNS checks query Cloudflare's resolver only. Historical certificate names and public DNS answers do not prove that an HTTP service is live or secure.
 
+## Runtime status
+
+The live health endpoint reports `mode: passive-only`, `scanner_state: paused`, and `egress: gateway-vpc` until the dedicated VPC binding and Gateway policy are configured and independently verified.
+
 ## Development
 
 The production Worker source is `worker.js`. Database schema is in `database/schema.sql`. Security design and release gates are in `docs/`.
