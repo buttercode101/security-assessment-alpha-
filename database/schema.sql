@@ -17,6 +17,7 @@ CREATE TABLE targets (
   verification_method TEXT,
   created_at TEXT NOT NULL,
   last_scan_at TEXT,
+  last_discovery_at TEXT,
   UNIQUE(workspace_id, hostname)
 );
 
@@ -71,3 +72,23 @@ CREATE INDEX idx_scans_workspace_started ON scans(workspace_id, started_at DESC)
 CREATE INDEX idx_findings_workspace_status ON findings(workspace_id, status);
 CREATE INDEX idx_findings_target_created ON findings(target_id, created_at DESC);
 CREATE INDEX idx_scan_events_scan_created ON scan_events(scan_id, created_at);
+
+
+CREATE TABLE discovered_assets (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  target_id TEXT NOT NULL REFERENCES targets(id) ON DELETE CASCADE,
+  hostname TEXT NOT NULL,
+  source TEXT NOT NULL CHECK(source IN ('certificate-transparency')),
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  certificate_not_before TEXT,
+  certificate_not_after TEXT,
+  issuer_name TEXT,
+  UNIQUE(target_id, hostname)
+);
+
+CREATE INDEX idx_discovered_assets_workspace_last_seen
+  ON discovered_assets(workspace_id, last_seen_at DESC);
+CREATE INDEX idx_discovered_assets_target_hostname
+  ON discovered_assets(target_id, hostname);
