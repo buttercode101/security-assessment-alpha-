@@ -34,7 +34,7 @@ The UI exposes **Run assessment** only when the live health endpoint reports the
 - Direct private IPv4, loopback, IPv6 loopback, IPv6 ULA, IPv6 link-local and a hostname resolving to a private IPv4 address were rejected with `ProxyError: destination_ip_prohibited`.
 - The IPv4 link-local metadata probe timed out; that specific runtime result is inconclusive. The destination range remains covered by the persistent Gateway policy.
 - A temporary, narrowly scoped Gateway L4 rule blocking the exact public IPv6 addresses observed for `example.com` caused the Worker request to fail during TLS setup. Removing the temporary rule restored HTTP 200. The temporary rule and diagnostic Worker were deleted after the test.
-- Gateway analytics showed Worker VPC as the on-ramp and Internet as the off-ramp. The sampled analytics did not provide a rule ID for the temporary blocked event, so detailed policy-log attribution remains an operational check before expanding scanner scope.
+- Gateway analytics recorded two blocked sessions with `action: block` and temporary test rule ID `9af7394d-d42a-4b23-8d00-5ed8624bdcd0`; both were `workers_vpc` on-ramp to `internet` off-ramp sessions for the exact `example.com` IPv6 destinations. The temporary rule was deleted after the A/B test. The persistent non-public-destination rule remains enabled; no claim is made that the temporary test rule is still present.
 
 DNS preflight and Gateway destination enforcement are separate controls. The preflight checks every returned A/AAAA answer; the Gateway policy protects the actual connection if DNS changes between lookup and connect.
 
