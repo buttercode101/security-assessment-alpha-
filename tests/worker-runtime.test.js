@@ -126,8 +126,8 @@ test("dashboard response uses a fresh nonce for inline assets and a restrictive 
   const csp = first.headers.get("content-security-policy");
   const nonce = csp.match(/script-src 'self' 'nonce-([^']+)'/)?.[1];
   assert.ok(nonce, "CSP should define a script nonce");
-  assert.match(html, new RegExp('<style nonce="' + nonce + '">'));
-  assert.match(html, new RegExp('<script nonce="' + nonce + '">'));
+  assert.ok(html.includes('<style nonce="' + nonce + '">'), "HTML should contain the exact CSP nonce on its style element");
+  assert.ok(html.includes('<script nonce="' + nonce + '">'), "HTML should contain the exact CSP nonce on its script element");
   assert.doesNotMatch(csp, /unsafe-inline/);
   assert.notEqual(csp, second.headers.get("content-security-policy"), "nonce should rotate per response");
 });
