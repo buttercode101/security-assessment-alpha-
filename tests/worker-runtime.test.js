@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import vm from "node:vm";
 import worker, { public4, public6 } from "../worker.js";
 
 function makeEnv() {
@@ -208,4 +209,17 @@ test("string environment flag cannot open the boolean-only scan gate", async () 
   }), env);
   assert.equal(response.status, 503);
   assert.match((await response.json()).error, /temporarily paused/);
+});
+
+
+test("dashboard client JavaScript parses and all referenced primary controls exist", async () => {
+  const { env } = makeEnv();
+  const response = await worker.fetch(new Request("https://alpha.test/"), env);
+  const html = await response.text();
+  const script = html.match(/<script nonce="[^"]+">([\\s\\S]*?)<\\/script>/);
+  assert.ok(script, "nonce-protected client script should exist");
+  assert.doesNotThrow(() => new vm.Script(script[1]), "dashboard JavaScript should parse");
+  for (const id of ["form", "url", "add", "targets", "scans", "findings", "refresh", "tc", "sc", "fc"]) {
+    assert.ok(html.includes('id="' + id + '"'), "dashboard is missing #" + id);
+  }
 });
