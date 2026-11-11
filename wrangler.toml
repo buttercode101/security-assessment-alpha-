@@ -1,0 +1,11 @@
+name = "security-assessment-alpha"
+main = "worker.js"
+compatibility_date = "2026-11-11"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "secops-platform-core"
+database_id = "bb64e825-c896-4bdf-b301-36ae88dbdeaf"
+
+# Intentionally do not define SCAN_EGRESS_READY.
+# Scanning must remain disabled until the isolated scanner architecture is implemented and tested.
