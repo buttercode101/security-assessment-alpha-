@@ -16,8 +16,8 @@
 2. Public IP classification is incomplete and must not be treated as a complete special-purpose registry implementation.
 3. No network-layer egress isolation, scanner sandbox, global rate limiting, bot controls, account auth, or abuse response process.
 4. Cookie-based anonymous workspaces can be lost when browser data is cleared and are not suitable as a multi-user identity system.
-5. Existing Worker UI uses inline script/style and currently relaxes CSP with unsafe-inline.
-6. No independent live HTTP smoke test has yet confirmed runtime behaviour.
+5. The dashboard uses inline script/style with per-response CSP nonces; browser interaction has not yet been independently exercised end-to-end.
+6. Live health and dashboard HTML responses have been checked, but interactive browser flows and DNS ownership verification have not yet been independently exercised end-to-end.
 
 ## Required before enabling scans
 - Move outbound requests into an isolated scanner service/network with deny-by-default egress.
@@ -30,6 +30,7 @@
 - Authenticate users and implement tenant-scoped authorization on every object access.
 - Add audit events, abuse reporting, retention/deletion policy and operational alerting.
 - Independently test SSRF, DNS rebinding, IPv4/IPv6 edge cases, redirects, tenant isolation, CSRF, XSS, quotas and failure recovery.
+- Keep runtime request tests in CI for origin enforcement, cookie attributes, target URL validation and the scan feature gate.
 
 ## AI safety
 AI may summarize deterministic evidence and draft remediation. It must not expand scope, execute tests, claim exploitability, or mark a finding verified without deterministic evidence and human approval.
