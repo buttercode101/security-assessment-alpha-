@@ -18,3 +18,39 @@ jobs:
         with:
           node-version: 22
       - run: npm test
+      - name: Live Cloudflare deployment smoke test
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import vm from "node:vm";
+
+          const base = "https://security-assessment-alpha.buttercoder-dev.workers.dev";
+          const [healthResponse, pageResponse] = await Promise.all([
+            fetch(base + "/api/health", { signal: AbortSignal.timeout(15000) }),
+            fetch(base + "/", { signal: AbortSignal.timeout(15000) })
+          ]);
+
+          assert.equal(healthResponse.status, 200, "live health endpoint must return 200");
+          assert.deepEqual(await healthResponse.json(), {
+            ok: true,
+            service: "security-assessment-alpha",
+            mode: "passive-only"
+          });
+
+          assert.equal(pageResponse.status, 200, "live dashboard must return 200");
+          const html = await pageResponse.text();
+          const csp = pageResponse.headers.get("content-security-policy") || "";
+          const nonce = csp.match(/script-src 'self' 'nonce-([^']+)'/)?.[1];
+          assert.ok(nonce, "live CSP must include a script nonce");
+          assert.ok(html.includes('<script nonce="' + nonce + '">'), "live script must carry the CSP nonce");
+          assert.ok(!csp.includes("unsafe-inline"), "live CSP must not allow unsafe inline scripts");
+          for (const id of ["targets", "scans", "assets", "findings"]) {
+            assert.ok(html.includes('id="' + id + '"'), "live dashboard is missing #" + id);
+          }
+          const scriptStart = html.indexOf('<script nonce="' + nonce + '">');
+          const bodyStart = html.indexOf(">", scriptStart) + 1;
+          const scriptEnd = html.indexOf("</script>", bodyStart);
+          assert.ok(scriptStart >= 0 && scriptEnd > bodyStart, "live dashboard script must be present");
+          assert.doesNotThrow(() => new vm.Script(html.slice(bodyStart, scriptEnd)), "live dashboard JavaScript must parse");
+          console.log("Live Cloudflare health and dashboard smoke tests passed.");
+          NODE
