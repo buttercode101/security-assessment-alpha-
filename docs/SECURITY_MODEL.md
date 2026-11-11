@@ -5,32 +5,38 @@
 - Workspace token is high entropy and only its SHA-256 hash is stored.
 - HTTPS origins only; userinfo, non-standard ports, IP literals, localhost and selected special-use suffixes rejected.
 - Ownership proof is DNS TXT only: `_secops-verification.<hostname>`.
-- DNS A/AAAA answers are checked against conservative IPv4/IPv6 syntax and common special-purpose, documentation and transition-range filters; this is not a complete IANA registry implementation.
+- DNS A/AAAA preflight rejects malformed literals and common special-purpose ranges. This is conservative but not a complete IANA registry and is not, by itself, an SSRF control.
 - Redirects are not followed.
 - Non-GET API calls require an exact Origin match.
-- Scan route is closed unless `SCAN_EGRESS_READY === true`; do not set this flag in the current Worker.
-- No crawling, exploit payloads, auth bypass, load generation, stress tests, or DDoS.
+- The scan route requires both an `EGRESS` VPC binding and `SCAN_EGRESS_READY=enabled`. Neither is configured in production, so scans remain paused.
+- No crawling, exploit payloads, authentication bypass, load generation, stress tests, or DDoS.
+
+## Current scanner infrastructure decision
+- The preferred low-cost route is Cloudflare Workers VPC plus a dedicated Gateway L4 policy. Cloudflare documents Workers VPC as available on Free and Paid plans while in beta, and documents Gateway policies applying to Worker-originated internet traffic.
+- The connected account has not enabled Access/Zero Trust. The Gateway API returned `access.api.error.not_enabled` and instructed an administrator to enable Access in the Cloudflare dashboard.
+- A temporary dedicated virtual network was created while testing the API and immediately deleted after Gateway policy creation was rejected. The account currently has no virtual networks or Gateway rules.
+- Do not add the `EGRESS` binding or set `SCAN_EGRESS_READY=enabled` until Access is enabled, a dedicated virtual network is created, and a scoped Gateway policy blocks private, loopback, link-local, CGNAT, documentation, multicast, reserved, transition, and non-global destination ranges.
+- Before opening the gate, independently prove that public HTTPS destinations work and private IPv4/IPv6 destinations are blocked at the network layer, including DNS-rebinding attempts. The scanner must continue to reject redirects and use HTTPS/443 only.
 
 ## Critical limitations (not production-safe)
-1. DNS validation is not bound to the actual connection. A separate DNS lookup followed by Worker fetch can be vulnerable to rebinding/TOCTOU.
-2. Public IP classification is deliberately conservative but incomplete. It is a preflight guard only, not a complete IANA special-purpose registry implementation or a substitute for connect-time egress enforcement.
-3. No network-layer egress isolation, scanner sandbox, global rate limiting, bot controls, account auth, or abuse response process.
-4. Cookie-based anonymous workspaces can be lost when browser data is cleared and are not suitable as a multi-user identity system.
-5. The dashboard uses inline script/style with per-response CSP nonces. CI now checks the live health endpoint, live dashboard HTML, CSP nonce, required sections, and parses the live client script; interactive browser actions still need a separate E2E session.
-6. Live health and dashboard HTML responses have been checked, but interactive browser flows and DNS ownership verification have not yet been independently exercised end-to-end.
+1. The production Worker currently has no `EGRESS` binding. The health endpoint reports `scanner_state: paused`.
+2. DNS preflight is a separate lookup from the eventual connection. The future Gateway policy is required to block non-public destinations at connection time; preflight alone is not sufficient.
+3. The anonymous browser workspace can be lost when browser data is cleared and is not a multi-user identity system.
+4. No global abuse controls, bot controls, account auth, RBAC, MFA, or abuse response process.
+5. Interactive browser flows and DNS ownership verification have not yet been independently exercised end-to-end. CI verifies the live health endpoint, live dashboard HTML, CSP nonce, required sections, and parses the live client script.
 
 ## Required before enabling scans
-- Move outbound requests into an isolated scanner service/network with deny-by-default egress.
-- Enforce destination IP policy at connect time, not just during preflight DNS.
-- Resolve and validate all A/AAAA/CNAME chains; pin validated destination; reject mixed public/private answer sets.
+- Enable Cloudflare Access/Zero Trust in the account dashboard.
+- Create a dedicated VPC network and a Gateway L4 block policy scoped only to that network.
+- Bind the Worker to that VPC network using `EGRESS`; verify Gateway logs show the scanner's traffic.
+- Enforce destination IP policy at the network layer; resolve and validate all A/AAAA/CNAME answers and reject mixed public/private sets.
 - Revalidate every redirect and default to not following redirects.
 - Restrict protocol and port to HTTPS/443.
-- Add global and per-workspace/per-target rate limits, concurrency caps, request timeouts, response byte caps and emergency stop.
-- Separate control plane from scanner runtime and use a durable queue.
+- Add global and per-workspace/per-target rate limits, concurrency caps, request timeouts, response byte caps and an emergency stop.
+- Separate control plane from scanner runtime and use a durable queue before adding crawling or broader checks.
 - Authenticate users and implement tenant-scoped authorization on every object access.
 - Add audit events, abuse reporting, retention/deletion policy and operational alerting.
 - Independently test SSRF, DNS rebinding, IPv4/IPv6 edge cases (including malformed literals, mapped addresses, transition and documentation ranges), redirects, tenant isolation, CSRF, XSS, quotas and failure recovery.
-- Keep runtime request tests in CI for origin enforcement, cookie attributes, target URL validation and the scan feature gate.
 
 ## Passive asset discovery
 - Only a DNS-TXT-verified target can trigger certificate transparency discovery.
