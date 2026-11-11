@@ -16,7 +16,7 @@ function makeEnv() {
           if (sql.includes("SELECT id FROM targets WHERE workspace_id")) return null;
           if (sql.includes("SELECT id FROM targets WHERE id=? AND workspace_id=?")) return values[0] === "00000000-0000-4000-8000-000000000000" ? { id: values[0] } : null;
           if (sql.includes("SELECT a.id,a.hostname,a.dns_checked_at")) return { id: values[0], hostname: "api.example.org", dns_checked_at: env.TEST_DNS_COOLDOWN ? new Date().toISOString() : null, verified_at: env.TEST_DNS_UNVERIFIED ? null : "2026-11-11T00:00:00.000Z" };
-          if (sql.includes("SELECT * FROM targets WHERE id=? AND workspace_id=?")) return { id: "00000000-0000-4000-8000-000000000000", verified_at: env.TEST_UNVERIFIED ? null : "2026-11-11T00:00:00.000Z", last_scan_at: null, last_discovery_at: env.TEST_COOLDOWN ? new Date().toISOString() : null, hostname: "example.org", url: "https://example.org" };
+          if (sql.includes("SELECT * FROM targets WHERE id=? AND workspace_id=?")) return { id: "00000000-0000-4000-8000-000000000000", verification_token: env.TEST_VERIFICATION_TOKEN || "test-token", verified_at: env.TEST_UNVERIFIED ? null : "2026-11-11T00:00:00.000Z", last_scan_at: null, last_discovery_at: env.TEST_COOLDOWN ? new Date().toISOString() : null, hostname: "example.org", url: "https://example.org" };
           if (sql.includes("SELECT COUNT(*) n FROM targets")) return { n: 0 };
           return null;
         },
@@ -423,6 +423,64 @@ test("passive scan sends target request only through the EGRESS binding", async 
     assert.equal(response.status, 200);
     assert.equal(egressCalls, 1);
     assert.ok(writes.some(item => item.sql.includes("INSERT INTO scans")));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+
+test("ownership verification accepts the exact DNS TXT challenge", async () => {
+  const { env, writes } = makeEnv();
+  env.TEST_UNVERIFIED = true;
+  const cookie = await createSession(env);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const type = new URL(String(url)).searchParams.get("type");
+    const Answer = type === "A"
+      ? [{ type: 1, data: "93.184.216.34" }]
+      : type === "TXT"
+        ? [{ type: 16, data: '"test-token"' }]
+        : [];
+    return new Response(JSON.stringify({ Answer }), { status: 200 });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/verify", {
+      method: "POST",
+      headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+      body: "{}"
+    }), env);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { verified: true, method: "dns-txt" });
+    assert.ok(writes.some(item => item.sql.includes("UPDATE targets SET verified_at")));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("ownership verification rejects a TXT value that does not match the challenge", async () => {
+  const { env, writes } = makeEnv();
+  env.TEST_UNVERIFIED = true;
+  env.TEST_VERIFICATION_TOKEN = "expected-token";
+  const cookie = await createSession(env);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const type = new URL(String(url)).searchParams.get("type");
+    const Answer = type === "A"
+      ? [{ type: 1, data: "93.184.216.34" }]
+      : type === "TXT"
+        ? [{ type: 16, data: '"different-token"' }]
+        : [];
+    return new Response(JSON.stringify({ Answer }), { status: 200 });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://alpha.test/api/targets/00000000-0000-4000-8000-000000000000/verify", {
+      method: "POST",
+      headers: { cookie, origin: "https://alpha.test", "content-type": "application/json" },
+      body: "{}"
+    }), env);
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /Ownership not verified/);
+    assert.equal(writes.some(item => item.sql.includes("UPDATE targets SET verified_at")), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
