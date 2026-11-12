@@ -53,6 +53,8 @@ jobs:
           for (const feature of ["Assessment history", "Discovered assets", "Discover assets", "Check DNS", "Run assessment"]) {
             assert.ok(html.includes(feature), "live dashboard is missing " + feature);
           }
+          assert.ok(html.includes('id="scan-notice" role="note" hidden'), "ready dashboard must not render a visible paused notice");
+          assert.ok(html.includes("Passive-only assessment: one HTTPS GET to the verified origin"), "ready dashboard must explain the live passive assessment scope");
           const scriptStart = html.indexOf('<script nonce="' + nonce + '">');
           const bodyStart = html.indexOf(">", scriptStart) + 1;
           const scriptEnd = html.indexOf("</script>", bodyStart);
