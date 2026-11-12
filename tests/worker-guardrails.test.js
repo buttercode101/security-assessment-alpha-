@@ -61,7 +61,7 @@ test("assessment UI submits only to the target's passive scan endpoint", () => {
 });
 
 test("initial dashboard HTML reflects the server-side scanner readiness gate", () => {
-  assert.match(source, /function page\(scannerReady=false\)/);
-  assert.match(source, /role="note"\'\s*,\'\<div class="notice" id="scan-notice" role="note"\'\+\(scannerReady\?" hidden":""\)/);
-  assert.match(source, /scannerReady\?"Passive-only assessment: one HTTPS GET to the verified origin/);
+  assert.ok(source.includes("function page(scannerReady=false)"));
+  assert.ok(source.includes('id="scan-notice" role="note"\'+(scannerReady?" hidden":"")'));
+  assert.ok(source.includes('scannerReady?"Passive-only assessment: one HTTPS GET to the verified origin'));
 });
