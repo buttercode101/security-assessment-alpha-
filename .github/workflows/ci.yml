@@ -116,6 +116,18 @@ jobs:
           console.log("Live anonymous workspace lifecycle passed.");
           NODE
 
+      - name: Temporary passive assessment integration proof
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          const url = "https://secops-passive-e2e.buttercoder-dev.workers.dev/";
+          const response = await fetch(url, { signal: AbortSignal.timeout(180000) });
+          assert.equal(response.status, 200, "integration harness must return structured result");
+          const result = await response.json();
+          console.log(JSON.stringify(result, null, 2));
+          assert.equal(result.ok, true, "passive assessment end-to-end integration must pass");
+          NODE
+
       - name: Publish machine-readable validation status
         if: always()
         uses: actions/github-script@v7
