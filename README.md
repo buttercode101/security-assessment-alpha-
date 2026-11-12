@@ -44,7 +44,7 @@ DNS preflight and Gateway destination enforcement are separate controls. The pre
 - Workspace identity is a high-entropy browser cookie, not a user account. Clearing browser data can lose access.
 - No MFA, RBAC, team membership or account recovery.
 - Global abuse controls, workspace-level quotas, alerting and an abuse-response process still need strengthening before public launch.
-- A real successful DNS TXT verification on a domain controlled by the project owner has not yet been independently exercised in this environment. The live CI lifecycle test verifies anonymous workspace creation, target registration, duplicate rejection, rejection of unverified scans and target deletion.
+- A successful DNS TXT verification on a domain controlled by the project owner has not yet been independently exercised in this environment. The production integration proof deliberately confirmed that an unowned `example.com` target is rejected, then used a disposable D1-only verified fixture to exercise CT discovery (5 names), asset DNS checking, one passive assessment (HTTP 200; 7 observations), scan-history persistence, overview counts and complete cleanup. The fixture was deleted after the test; it does not represent successful real DNS ownership proof. The live CI lifecycle test independently verifies anonymous workspace creation, target registration, duplicate rejection, rejection of unverified scans and target deletion.
 - No public release or broader scan features until authentication, tenant isolation, operational controls and the remaining egress/logging checks are completed.
 
 ## Development
