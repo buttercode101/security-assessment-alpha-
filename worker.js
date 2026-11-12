@@ -119,7 +119,9 @@ load();
 
 function page(scannerReady=false){
  const nonce=btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
- const html=PAGE.replaceAll("__CSP_NONCE__",nonce);
+ let html=PAGE.replaceAll("__CSP_NONCE__",nonce);
+ html=html.replace('<div class="notice" id="scan-notice" role="note">','<div class="notice" id="scan-notice" role="note"'+(scannerReady?" hidden":"")+">");
+ html=html.replace('<div class="form-hint" id="form-hint">No exploit attempts, crawling, redirect following or traffic flooding. This is a passive, single-origin HTTP configuration check.</div>','<div class="form-hint" id="form-hint">'+(scannerReady?"Passive-only assessment: one HTTPS GET to the verified origin, no redirects, crawling or exploit attempts.":"No exploit attempts, crawling, redirect following or traffic flooding. This is a passive, single-origin HTTP configuration check.")+"</div>");
  const policy="default-src 'self'; script-src 'self' 'nonce-"+nonce+"'; style-src 'self' 'nonce-"+nonce+"'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
  return new Response(html,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":policy,"referrer-policy":"strict-origin-when-cross-origin","x-content-type-options":"nosniff","x-frame-options":"DENY","strict-transport-security":"max-age=31536000; includeSubDomains"}});
 }
