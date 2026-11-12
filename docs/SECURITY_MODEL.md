@@ -42,7 +42,7 @@ The VPC proxy's `destination_ip_prohibited` responses show that the tested priva
 ## Critical limitations
 
 1. This remains a private alpha, not a full vulnerability scanner or penetration-testing service.
-2. A successful DNS TXT verification on a domain controlled by the project owner has not yet been independently exercised in this environment. The live CI lifecycle test checks anonymous workspace creation, target registration, duplicate rejection, rejection of unverified scans and target deletion.
+2. A successful DNS TXT verification on a domain controlled by the project owner has not yet been independently exercised. An isolated production integration proof confirmed unowned-domain rejection, then used a disposable D1 verified fixture to exercise CT discovery, DNS asset checking, one passive assessment, scan-history persistence, overview counts and complete cleanup. This proves the assessment path but not a successful live DNS TXT ownership proof. The regular live CI lifecycle test covers anonymous workspace creation, target registration, duplicate rejection, rejection of unverified scans and target deletion.
 3. The IPv4 link-local metadata probe timed out and remains inconclusive.
 4. The persistent Gateway rule is account-scoped for matching Internet-bound traffic because a supported Workers VPC-only Traffic Source selector was not available.
 5. The anonymous browser workspace can be lost when browser data is cleared and is not a multi-user identity system.
